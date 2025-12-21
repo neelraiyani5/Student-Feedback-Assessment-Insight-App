@@ -5,9 +5,21 @@ import generateToken from "../utils/jwt.js";
 
 export const register = async (req, res) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, email, password, role, semesterId } = req.body;
 
-        const existingUser = await prisma.user.findUnique({ where: {email} });
+        if (role === "STUDENT" && !semesterId) {
+            return res.status(400).json({
+                message: "Semester is required for students"
+            });
+        }
+
+        if (role !== "STUDENT" && semesterId) {
+            return res.status(400).json({
+                message: "Semester should not be assigned to non-student roles"
+            });
+        }
+
+        const existingUser = await prisma.user.findUnique({ where: { email } });
 
         if (existingUser) {
             return res.status(400).json({ message: "User already exists!!!" })
@@ -20,8 +32,10 @@ export const register = async (req, res) => {
                 name,
                 email,
                 password: hasedPassword,
-                role
-            }
+                role,
+                semesterId: role === "STUDENT" ? semesterId: null
+            },
+            omit: {password: true}
         });
 
         const token = generateToken(user.id);
@@ -36,27 +50,27 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
     try {
-        const {email, password} = req.body;
+        const { email, password } = req.body;
 
-        const user = await prisma.user.findUnique({where:{email}});
+        const user = await prisma.user.findUnique({ where: { email } });
 
-        if(!user) return res.status(401).json({message: "Invalid Credentials!!!"});
+        if (!user) return res.status(401).json({ message: "Invalid Credentials!!!" });
 
         const isMatch = await bcrypt.compare(password, user.password);
 
-        if(!isMatch) return res.status(401).json({message: "Invalid Credentials!!!"});
+        if (!isMatch) return res.status(401).json({ message: "Invalid Credentials!!!" });
 
         const token = generateToken(user.id);
 
-        res.status(200).json({message: "Login Successfull", Token: token})
-        
+        res.status(200).json({ message: "Login Successfull", Token: token })
+
     } catch (error) {
-        
+
     }
 }
 
 
 
 export const getme = async (req, res) => {
-    res.status(200).json({user: req.user});
+    res.status(200).json({ user: req.user });
 }

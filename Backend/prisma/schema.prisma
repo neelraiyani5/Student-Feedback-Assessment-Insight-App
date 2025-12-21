@@ -24,6 +24,9 @@ model User {
   hodDepartments Department[] @relation("HOD_Department")
   subjects       Subject[]    @relation("Faculty_Subject")
 
+  semester  Semester? @relation(fields: [semesterId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  semesterId String?
+
   createdAt DateTime @default(now())
 }
 
@@ -37,7 +40,7 @@ enum Role {
 model Department {
   id        String     @id @default(auto()) @map("_id") @db.ObjectId
   name      String     @unique
-  hod       User       @relation("HOD_Department", fields: [hodId], references: [id])
+  hod       User       @relation("HOD_Department", fields: [hodId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   hodId     String     @db.ObjectId
   semesters Semester[]
   createdAt DateTime   @default(now())
@@ -46,9 +49,10 @@ model Department {
 model Semester {
   id           String     @id @default(auto()) @map("_id") @db.ObjectId
   name         String
-  department   Department @relation(fields: [departmentId], references: [id])
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   departmentId String     @db.ObjectId
   subjects     Subject[]
+  students     User[]
   createdAt    DateTime   @default(now())
 
    @@unique([name, departmentId], name: "name_departmentId")
