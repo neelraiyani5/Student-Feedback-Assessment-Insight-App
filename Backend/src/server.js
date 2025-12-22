@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 
 import connectDB from "./config/db.js";
+import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import departmentRoutes from "./routes/departmentRoutes.js";
 import semesterRoutes from "./routes/semesterRoutes.js";
@@ -15,6 +16,7 @@ connectDB();
 
 app.use(express.json());
 
+app.use('/user', adminRoutes);
 app.use('/auth', authRoutes);
 app.use('/department', departmentRoutes);
 app.use('/semester', semesterRoutes);
