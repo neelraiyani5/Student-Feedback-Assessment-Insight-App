@@ -3,56 +3,11 @@ import prisma from "../prisma/client.js";
 
 import generateToken from "../utils/jwt.js";
 
-export const register = async (req, res) => {
-    try {
-        const { name, email, password, role, semesterId } = req.body;
-
-        if (role === "STUDENT" && !semesterId) {
-            return res.status(400).json({
-                message: "Semester is required for students"
-            });
-        }
-
-        if (role !== "STUDENT" && semesterId) {
-            return res.status(400).json({
-                message: "Semester should not be assigned to non-student roles"
-            });
-        }
-
-        const existingUser = await prisma.user.findUnique({ where: { email } });
-
-        if (existingUser) {
-            return res.status(400).json({ message: "User already exists!!!" })
-        }
-
-        const hasedPassword = await bcrypt.hash(password, 10);
-
-        const user = await prisma.user.create({
-            data: {
-                name,
-                email,
-                password: hasedPassword,
-                role,
-                semesterId: role === "STUDENT" ? semesterId: null
-            },
-            omit: {password: true}
-        });
-
-        const token = generateToken(user.id);
-
-        res.status(201).json({ message: "User created successfully", User: user, Token: token });
-    } catch (error) {
-        res.status(500).json({ Message: "Registration Failed Due to Internal Server Error!!!", error });
-    }
-}
-
-
-
 export const login = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { userId, password } = req.body;
 
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await prisma.user.findUnique({ where: { userId } });
 
         if (!user) return res.status(401).json({ message: "Invalid Credentials!!!" });
 
@@ -62,10 +17,10 @@ export const login = async (req, res) => {
 
         const token = generateToken(user.id);
 
-        res.status(200).json({ message: "Login Successfull", Token: token })
+        res.status(200).json({ message: "Login Successfull", token: token, mustChangePassword: user.mustChangePassword })
 
     } catch (error) {
-
+        res.status(500).json({ message: "Login Failed!!!", error })
     }
 }
 
@@ -74,3 +29,30 @@ export const login = async (req, res) => {
 export const getme = async (req, res) => {
     res.status(200).json({ user: req.user });
 }
+
+
+
+export const changePassword = async (req, res) => {
+    try {
+        const { newPassword } = req.body;
+
+        if (!newPassword) {
+            return res.status(400).json({ message: "New password required" });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        await prisma.user.update({
+            where: { id: req.userId },
+            data: {
+                password: hashedPassword,
+                mustChangePassword: false
+            }
+        });
+
+        res.status(200).json({ message: "Password changed successfully. Please login again." });
+
+    } catch (error) {
+        res.status(500).json({ message: "Failed to change password", error });
+    }
+};

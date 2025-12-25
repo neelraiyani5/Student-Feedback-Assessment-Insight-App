@@ -18,9 +18,16 @@ const auth = async (req, res, next) => {
         req.userId = decoded.id;
 
         const user = await prisma.user.findUnique({
-            where: { id: req.userId },
-            omit: {createdAt: true}
+            where: { id: req.userId }
         });
+
+        if (!user) {
+            return res.status(401).json({ message: "User not found" });
+        }
+
+        if(user.mustChangePassword && !req.path.includes("/auth/change-password")){
+            return res.status(403).json({message: "Password change required!!!"})
+        }
         
         req.user = user;
         next();

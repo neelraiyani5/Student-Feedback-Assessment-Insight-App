@@ -27,6 +27,8 @@ model User {
 
   semester  Semester? @relation(fields: [semesterId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   semesterId String?
+  
+  mustChangePassword Boolean @default(true)
 
   createdAt DateTime @default(now())
 }

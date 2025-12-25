@@ -21,7 +21,7 @@ const seedHodDepartment = async (req, res) => {
             data: {
                 userId: hodUserId,
                 name: "CD Parmar",
-                email: "cdp@gmail.com",
+                email: process.env.HOD_EMAIL,
                 password: hashedPassword,
                 role: "HOD"
             }
