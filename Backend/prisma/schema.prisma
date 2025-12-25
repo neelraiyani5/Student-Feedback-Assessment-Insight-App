@@ -21,15 +21,12 @@ model User {
   email    String @unique
   password String
   role     Role   @default(STUDENT)
-
   hodDepartments Department[] @relation("HOD_Department")
+  classId String? @db.ObjectId
+  ccOfClass Class? @relation("Class_CC")
+  class   Class? @relation("Class_Students", fields: [classId], references: [id],  onDelete: NoAction, onUpdate: NoAction)
   subjects       Subject[]    @relation("Faculty_Subject")
-
-  semester  Semester? @relation(fields: [semesterId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  semesterId String?
-  
   mustChangePassword Boolean @default(true)
-
   createdAt DateTime @default(now())
 }
 
@@ -52,13 +49,26 @@ model Department {
 model Semester {
   id           String     @id @default(auto()) @map("_id") @db.ObjectId
   name         String
-  department   Department @relation(fields: [departmentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  department   Department @relation(fields: [departmentId], references: [id])
   departmentId String     @db.ObjectId
+  classes      Class[]
   subjects     Subject[]
-  students     User[]
   createdAt    DateTime   @default(now())
 
    @@unique([name, departmentId], name: "name_departmentId")
+}
+
+model Class {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  semesterId String   @db.ObjectId
+  semester   Semester @relation(fields: [semesterId], references: [id])
+  ccId       String?  @unique @db.ObjectId
+  cc         User?    @relation("Class_CC", fields: [ccId], references: [id],  onDelete: NoAction, onUpdate: NoAction)
+  students   User[]   @relation("Class_Students")
+  createdAt  DateTime @default(now())
+  
+  @@unique([name, semesterId])
 }
 
 model Subject {

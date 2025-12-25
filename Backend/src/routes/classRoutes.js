@@ -1,10 +1,12 @@
 import express from "express";
 import auth from "../middlewares/auth.js";
 import role from "../middlewares/role.js";
-import { getDepartmentOverview } from "../controllers/departmentController.js";
+import { addClass, classStudents } from "../controllers/classController.js";
 
 const router = express.Router();
 
-router.get('/overview/:id', auth, role("HOD"), getDepartmentOverview);
+router.post('/add',auth, role("HOD"), addClass);
+
+router.get('/students/:classId', classStudents);
 
 export default router;

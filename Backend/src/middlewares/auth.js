@@ -25,7 +25,7 @@ const auth = async (req, res, next) => {
             return res.status(401).json({ message: "User not found" });
         }
 
-        if(user.mustChangePassword && !req.path.includes("/auth/change-password")){
+        if(user.mustChangePassword && !req.path.includes("/change-password")){
             return res.status(403).json({message: "Password change required!!!"})
         }
         

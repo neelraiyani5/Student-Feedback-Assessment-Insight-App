@@ -1,24 +1,5 @@
 import prisma from "../prisma/client.js";
 
-export const createDepartment = async (req, res) => {
-    try {
-        const { name } = req.body;
-
-        const department = await prisma.department.create({
-            data: {
-                name,
-                hodId: req.user.id
-            }
-        });
-
-        res.status(201).json(department);
-    } catch (error) {
-        res.status(500).json({ message: "Failed to create department", error });
-    }
-}
-
-
-
 export const getDepartmentOverview = async (req, res) => {
     try {
         const { id } = req.params;

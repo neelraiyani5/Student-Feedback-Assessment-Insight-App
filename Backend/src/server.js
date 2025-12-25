@@ -6,6 +6,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import departmentRoutes from "./routes/departmentRoutes.js";
 import semesterRoutes from "./routes/semesterRoutes.js";
+import classRoutes from "./routes/classRoutes.js";
 import subjectRoutes from "./routes/subjectRoutes.js";
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use('/user', adminRoutes);
 app.use('/auth', authRoutes);
 app.use('/department', departmentRoutes);
 app.use('/semester', semesterRoutes);
+app.use('/class', classRoutes);
 app.use('/subject', subjectRoutes);
 
 app.listen(port, () => {

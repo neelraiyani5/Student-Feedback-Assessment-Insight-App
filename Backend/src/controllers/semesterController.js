@@ -23,4 +23,4 @@ export const createSemester = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: "Failed to create semester" });
     }
-};
+}

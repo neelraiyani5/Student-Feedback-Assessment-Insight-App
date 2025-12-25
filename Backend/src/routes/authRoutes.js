@@ -5,7 +5,8 @@ import auth from "../middlewares/auth.js";
 const router = express.Router();
 
 router.post('/login', login);
-router.post('/change-password', auth, changePassword);
+
+router.patch('/change-password', auth, changePassword);
 
 router.get('/me', auth, getme);
 
