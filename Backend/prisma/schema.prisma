@@ -25,6 +25,8 @@ model User {
   classId String? @db.ObjectId
   ccOfClass Class? @relation("Class_CC")
   class   Class? @relation("Class_Students", fields: [classId], references: [id],  onDelete: NoAction, onUpdate: NoAction)
+  poolId   String? @db.ObjectId
+  pool     StudentPool? @relation(fields: [poolId], references: [id])
   subjects       Subject[]    @relation("Faculty_Subject")
   mustChangePassword Boolean @default(true)
   createdAt DateTime @default(now())
@@ -66,6 +68,7 @@ model Class {
   ccId       String?  @unique @db.ObjectId
   cc         User?    @relation("Class_CC", fields: [ccId], references: [id],  onDelete: NoAction, onUpdate: NoAction)
   students   User[]   @relation("Class_Students")
+  pools StudentPool[]
   createdAt  DateTime @default(now())
   
   @@unique([name, semesterId])
@@ -82,3 +85,21 @@ model Subject {
 
   @@unique([name, semesterId], name: "name_semesterId")
 }
+
+enum PoolType {
+  FAST
+  MEDIUM
+  SLOW
+}
+
+model StudentPool {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  classId   String   @db.ObjectId
+  class     Class    @relation(fields: [classId], references: [id])
+  type      PoolType
+  students  User[]
+  createdAt DateTime @default(now())
+
+  @@unique([classId, type])
+}
+

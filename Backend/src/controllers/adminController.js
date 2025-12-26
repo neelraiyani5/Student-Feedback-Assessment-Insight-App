@@ -34,18 +34,13 @@ export const makeCC = async (req, res) => {
     try {
         const { facultyId, classId } = req.body;
 
-        const facutly = await prisma.user.findUnique({ where: { id: facultyId } });
+        const faculty = await prisma.user.findUnique({ where: { id: facultyId } });
 
-        if (!facutly || facutly.role !== "FACULTY") {
+        if (!faculty || faculty.role !== "FACULTY") {
             return res.status(404).json({ message: "Faculty not found or already CC of class!!!" });
         }
 
-        const classData = await prisma.class.findUnique({ where: { id: classId } })
-
-        await prisma.user.update({
-            where: { id: facultyId },
-            data: { role: "CC" }
-        });
+        const classData = await prisma.class.findUnique({ where: { id: classId } });
 
         if (!classData) {
             return res.status(404).json({ message: "Class not found" });
@@ -66,8 +61,8 @@ export const makeCC = async (req, res) => {
             })
         ]);
 
-        res.status(201).json({ message: "Faculty promotoded to CC" });
+        res.status(201).json({ message: "Faculty promoted to CC" });
     } catch (error) {
-        res.status(500).json({ message: "Failed to promote CC", error });
+        res.status(500).json({ error: error.message });
     }
-}
+};
