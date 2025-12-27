@@ -5,10 +5,6 @@ export const createUser = async (req, res) => {
     try {
         const { userId, name, email, role } = req.body;
 
-        if (!["STUDENT", "FACULTY"].includes(role)) {
-            return res.status(400).json({ message: "Invalid Role!!!" });
-        }
-
         const password = Math.random().toString(36).slice(-8);
         const hashedPassword = await bcrypt.hash(password, 10);
 

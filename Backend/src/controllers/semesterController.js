@@ -2,11 +2,11 @@ import prisma from "../prisma/client.js";
 
 export const createSemester = async (req, res) => {
     try {
-        const { name, departmentId } = req.body;
+        const { sem, departmentId } = req.body;
 
         const existingSemester = await prisma.semester.findUnique({
             where: {
-                name_departmentId: { name, departmentId }
+                sem,_departmentId: { sem, departmentId }
             }
         });
 
@@ -14,7 +14,7 @@ export const createSemester = async (req, res) => {
 
         const semester = await prisma.semester.create({
             data: {
-                name,
+                sem,
                 departmentId
             }
         });

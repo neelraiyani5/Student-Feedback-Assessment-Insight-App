@@ -50,14 +50,14 @@ model Department {
 
 model Semester {
   id           String     @id @default(auto()) @map("_id") @db.ObjectId
-  name         String
+  sem     Int
   department   Department @relation(fields: [departmentId], references: [id])
   departmentId String     @db.ObjectId
   classes      Class[]
   subjects     Subject[]
   createdAt    DateTime   @default(now())
 
-   @@unique([name, departmentId], name: "name_departmentId")
+   @@unique([sem, departmentId], name: "sem_departmentId")
 }
 
 model Class {
