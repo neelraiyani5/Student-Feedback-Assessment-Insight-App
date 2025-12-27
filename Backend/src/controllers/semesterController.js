@@ -6,7 +6,7 @@ export const createSemester = async (req, res) => {
 
         const existingSemester = await prisma.semester.findUnique({
             where: {
-                sem,_departmentId: { sem, departmentId }
+                sem_departmentId: { sem, departmentId }
             }
         });
 
