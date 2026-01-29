@@ -19,6 +19,6 @@ const assignFacultyValidation = [
 
 router.post('/create', auth, role("CC", "HOD"), createSubjectValidation, validate, createSubject);
 
-router.put('/assign-faculty', auth, role("CC", "HOD"), assignFacultyValidation, validate, assignFaculty);
+router.patch('/assign-faculty', auth, role("CC", "HOD"), assignFacultyValidation, validate, assignFaculty);
 
 export default router;

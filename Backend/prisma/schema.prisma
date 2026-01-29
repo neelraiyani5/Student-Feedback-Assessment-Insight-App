@@ -14,6 +14,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  STUDENT
+  FACULTY
+  HOD
+  CC
+}
+
+enum PoolType {
+  FAST
+  MEDIUM
+  SLOW
+}
+
+enum ComponentType {
+  CSE
+  IA
+  ESE
+}
+
 model User {
   id       String @id @default(auto()) @map("_id") @db.ObjectId
   userId   String    @unique
@@ -28,16 +47,11 @@ model User {
   poolId   String? @db.ObjectId
   pool     StudentPool? @relation(fields: [poolId], references: [id])
   subjects       Subject[]    @relation("Faculty_Subject")
+  marks Marks[]
   mustChangePassword Boolean @default(true)
   createdAt DateTime @default(now())
 }
 
-enum Role {
-  STUDENT
-  FACULTY
-  HOD
-  CC
-}
 
 model Department {
   id        String     @id @default(auto()) @map("_id") @db.ObjectId
@@ -86,12 +100,6 @@ model Subject {
   @@unique([name, semesterId], name: "name_semesterId")
 }
 
-enum PoolType {
-  FAST
-  MEDIUM
-  SLOW
-}
-
 model StudentPool {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   classId   String   @db.ObjectId
@@ -101,5 +109,38 @@ model StudentPool {
   createdAt DateTime @default(now())
 
   @@unique([classId, type])
+}
+
+model Assessment {
+  id        String        @id @default(auto()) @map("_id") @db.ObjectId
+  title     String
+  component ComponentType
+  maxMarks  Int
+
+  subjectId String   @db.ObjectId
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+
+  classId   String   @db.ObjectId
+  class     Class    @relation(fields: [classId], references: [id])
+
+  marks     Marks[]
+  createdAt DateTime @default(now())
+
+  @@unique([title, subjectId, classId])
+}
+
+
+model Marks {
+  id            String @id @default(auto()) @map("_id") @db.ObjectId
+
+  studentId     String @db.ObjectId
+  student       User   @relation(fields: [studentId], references: [id])
+
+  assessmentId  String @db.ObjectId
+  assessment    Assessment @relation(fields: [assessmentId], references: [id])
+
+  marksObtained Int
+
+  @@unique([studentId, assessmentId])
 }
 

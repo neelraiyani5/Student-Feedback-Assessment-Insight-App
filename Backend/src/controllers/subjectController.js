@@ -31,12 +31,25 @@ export const assignFaculty = async (req, res) => {
     try {
         const { subjectId, facultyId } = req.body;
 
-        const subject = await prisma.subject.update({
+        const faculty = await prisma.user.findFirst({
+            where: {
+                id: facultyId,
+                role: { in: ["FACULTY", "CC", "HOD"] }
+            }
+        });
+
+        if (!faculty) return res.status(404).json({ message: "Faculty not found or invalid role!!!" })
+
+        const subject = await prisma.subject.findUnique({ where: { id: subjectId } });
+
+        if (!subject) return res.status(404).json({ message: "Subject not found!!!" });
+
+        const updateSubject = await prisma.subject.update({
             where: { id: subjectId },
             data: { facultyId }
         });
 
-        res.status(201).json(subject);
+        res.status(201).json({ messgae: "Faculty assigned to subject successfully", updateSubject });
     } catch (error) {
         res.status(500).json({ message: "Failed to assign faculty" });
     }
