@@ -42,7 +42,7 @@ model User {
   role     Role   @default(STUDENT)
   hodDepartments Department[] @relation("HOD_Department")
   classId String? @db.ObjectId
-  ccOfClass Class? @relation("Class_CC")
+  classesCoordinated Class[] @relation("Class_CC")
   class   Class? @relation("Class_Students", fields: [classId], references: [id],  onDelete: NoAction, onUpdate: NoAction)
   poolId   String? @db.ObjectId
   pool     StudentPool? @relation(fields: [poolId], references: [id])
@@ -79,14 +79,16 @@ model Class {
   name       String
   semesterId String   @db.ObjectId
   semester   Semester @relation(fields: [semesterId], references: [id])
-  ccId       String?  @unique @db.ObjectId
-  cc         User?    @relation("Class_CC", fields: [ccId], references: [id],  onDelete: NoAction, onUpdate: NoAction)
+  ccId       String?  @db.ObjectId
+  cc         User?    @relation("Class_CC", fields: [ccId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   students   User[]   @relation("Class_Students")
-  pools StudentPool[]
+  pools      StudentPool[]
+  assessments Assessment[]
   createdAt  DateTime @default(now())
-  
+
   @@unique([name, semesterId])
 }
+
 
 model Subject {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -95,10 +97,12 @@ model Subject {
   semesterId String   @db.ObjectId
   faculty    User?    @relation("Faculty_Subject", fields: [facultyId], references: [id])
   facultyId  String?  @db.ObjectId
+  assessments Assessment[]
   createdAt  DateTime @default(now())
 
   @@unique([name, semesterId], name: "name_semesterId")
 }
+
 
 model StudentPool {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId

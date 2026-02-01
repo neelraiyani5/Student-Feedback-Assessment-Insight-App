@@ -2,7 +2,7 @@ import express from "express";
 import { body } from "express-validator";
 import auth from "../middlewares/auth.js";
 import role from "../middlewares/role.js";
-import { addClass, addStudentToClass, addStudentToPool, classStudents } from "../controllers/classController.js";
+import { addClass, addStudentToClass, addStudentToPool, classStudents, updateClass, assignCC, createStudent, resetStudentPassword, updateStudent } from "../controllers/classController.js";
 import validate from "../middlewares/validate.js";
 
 const router = express.Router();
@@ -18,13 +18,34 @@ const addStudentToClassValidation = [
 ]
 
 const addStudentToPoolValidation = [
-    body("facultyId").isLength({ min: 24, max: 24 }).withMessage("Invalid ID length!!!"),
+    body("studentId").isLength({ min: 24, max: 24 }).withMessage("Invalid ID length!!!"),
     body("poolId").isLength({ min: 24, max: 24 }).withMessage("Invalid ID length!!!")
+]
+
+const createStudentValidation = [
+    body("userId").notEmpty(),
+    body("name").notEmpty(),
+    body("email").isEmail(),
+    body("classId").isLength({ min: 24, max: 24 })
+]
+
+const updateStudentValidation = [
+    body("studentId").isLength({ min: 24, max: 24 }),
+    body("userId").notEmpty(),
+    body("name").notEmpty(),
+    body("email").isEmail()
 ]
 
 router.post('/add', auth, role("HOD"), addClassValidation, validate, addClass);
 
+router.patch('/update/:id', auth, role("HOD"), updateClass);
+router.patch('/assign-cc', auth, role("HOD"), assignCC);
+
 router.get('/students/:classId', classStudents);
+
+router.post('/student/create', auth, role("HOD", "CC"), createStudentValidation, validate, createStudent);
+router.patch('/student/reset-password', auth, role("HOD", "CC"), resetStudentPassword);
+router.patch('/student/update', auth, role("HOD", "CC"), updateStudentValidation, validate, updateStudent);
 
 router.patch('/student/add', auth, role("HOD", "CC"), addStudentToClassValidation, validate, addStudentToClass);
 

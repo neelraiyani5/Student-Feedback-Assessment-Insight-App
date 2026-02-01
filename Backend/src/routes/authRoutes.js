@@ -8,12 +8,12 @@ const router = express.Router();
 
 const loginValidation = [
     body("userId").notEmpty().withMessage("User Id is required"),
-    body("password").notEmpty().withMessage("Password is required").isLength({ min: 6, max: 8 }).withMessage("Passsword length should be min 6 and max 8")
+    body("password").notEmpty().withMessage("Password is required").isLength({ min: 6, max: 20 }).withMessage("Passsword length should be min 6 and max 20")
 ]
 
 const changePasswordValidation = [
-    body("newPasword").notEmpty().withMessage("Password is required").isLength({ min: 6, max: 8 })
-        .withMessage("Passsword length should be min 6 and max 8")
+    body("newPassword").notEmpty().withMessage("Password is required").isLength({ min: 6, max: 20 })
+        .withMessage("Password length should be min 6 and max 20")
 ]
 
 router.post('/login', loginValidation, validate, login);

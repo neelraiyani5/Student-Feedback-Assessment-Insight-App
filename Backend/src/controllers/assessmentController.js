@@ -33,7 +33,7 @@ export const subjectAssessmentList = async (req, res) => {
     try {
         const { classId, subjectId } = req.params;
 
-        const assessment = await prisma.assessment.findmany({
+        const assessment = await prisma.assessment.findMany({
             where: {classId, subjectId}
         });
 

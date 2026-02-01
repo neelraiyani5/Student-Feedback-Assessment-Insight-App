@@ -7,8 +7,19 @@ export const getDepartmentOverview = async (req, res) => {
         const department = await prisma.department.findUnique({
             where: { id },
             select: {
+                id: true,
+                name: true,
                 semesters: {
-                    include: { subjects: true }
+                    include: { 
+                        subjects: true,
+                        classes: {
+                            include: {
+                                cc: {
+                                    select: { id: true, name: true, email: true }
+                                }
+                            }
+                        }
+                    }
                 },
                 hod: {
                     select: { id: true, name: true, email: true }
@@ -16,8 +27,26 @@ export const getDepartmentOverview = async (req, res) => {
             },
         });
 
-        res.status(201).json(department);
+        res.status(200).json(department);
+
     } catch (error) {
         res.status(500).json({ message: "Failed to get department overview" });
+    }
+}
+
+export const createDepartment = async (req, res) => {
+    try {
+        const { name, hodId } = req.body;
+
+        const department = await prisma.department.create({
+            data: {
+                name,
+                hodId
+            }
+        });
+
+        res.status(201).json(department);
+    } catch (error) {
+        res.status(500).json({ message: "Failed to create department", error: error.message });
     }
 }

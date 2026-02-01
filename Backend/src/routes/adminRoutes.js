@@ -2,7 +2,7 @@ import express from "express";
 import { body } from "express-validator";
 import auth from "../middlewares/auth.js";
 import role from "../middlewares/role.js";
-import { createUser, makeCC } from "../controllers/adminController.js";
+import { createUser, makeCC, getUsers, updateUser } from "../controllers/adminController.js";
 import validate from "../middlewares/validate.js";
 
 const router = express.Router();
@@ -21,5 +21,9 @@ const ccValidation = [
 router.post('/create', auth, role("HOD", "CC"), createUserValidation, validate, createUser);
 
 router.patch('/make-CC', auth, role("HOD"), ccValidation, validate, makeCC);
+
+router.get('/list', auth, role("HOD", "CC"), getUsers);
+
+router.patch('/update/:id', auth, role("HOD", "CC"), updateUser);
 
 export default router;

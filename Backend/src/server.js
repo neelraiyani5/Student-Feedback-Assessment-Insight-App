@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import cors from "cors";
 
 import connectDB from "./config/db.js";
 import adminRoutes from "./routes/adminRoutes.js";
@@ -13,10 +14,12 @@ import marksRoutes from "./routes/marksRoutes.js";
 dotenv.config();
 
 const port = process.env.PORT || 3002;
-const app =express();
+const app = express();
 
 connectDB();
 
+// Enable CORS for all origins (needed for React Native/Expo)
+app.use(cors());
 app.use(express.json());
 
 app.use('/user', adminRoutes);

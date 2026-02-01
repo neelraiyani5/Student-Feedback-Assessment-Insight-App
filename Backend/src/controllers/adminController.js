@@ -62,3 +62,51 @@ export const makeCC = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+export const getUsers = async (req, res) => {
+    try {
+        const { role } = req.query; // ?role=FACULTY or ?role=STUDENT
+
+        const filter = {};
+        if (role) {
+            const roles = role.split(',');
+            if (roles.length > 1) {
+                filter.role = { in: roles };
+            } else {
+                filter.role = role;
+            }
+        }
+
+        const users = await prisma.user.findMany({
+            where: filter,
+            select: {
+                id: true,
+                userId: true,
+                name: true,
+                email: true,
+                role: true,
+                classId: true
+            }
+        });
+
+        res.status(200).json(users);
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch users", error });
+    }
+}
+
+export const updateUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, email, userId } = req.body;
+
+        const updatedUser = await prisma.user.update({
+            where: { id },
+            data: { name, email, userId }
+        });
+
+        res.status(200).json({ message: "User updated successfully", user: updatedUser });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to update user", error });
+    }
+}
