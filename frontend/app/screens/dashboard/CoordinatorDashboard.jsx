@@ -136,19 +136,35 @@ const CoordinatorDashboard = () => {
 
                     {/* CC Features */}
                     {user?.role === 'CC' && (
-                         <TouchableOpacity 
-                            style={styles.adminCard} 
-                            onPress={() => router.push('/manage-students')}
-                        >
-                            <View style={[styles.adminIconContainer, { backgroundColor: COLORS.info }]}>
-                                <Ionicons name="people-circle" size={24} color={COLORS.white} />
-                            </View>
-                            <View style={styles.adminContent}>
-                                <AppText style={styles.adminTitle}>My Class & Students</AppText>
-                                <AppText variant="caption" style={styles.adminSubtitle}>Manage Students, View Class Details</AppText>
-                            </View>
-                            <Ionicons name="chevron-forward" size={24} color={COLORS.textLight} />
-                        </TouchableOpacity>
+                        <>
+                            <TouchableOpacity 
+                                style={styles.adminCard} 
+                                onPress={() => router.push('/manage-students')}
+                            >
+                                <View style={[styles.adminIconContainer, { backgroundColor: COLORS.info }]}>
+                                    <Ionicons name="people-circle" size={24} color={COLORS.white} />
+                                </View>
+                                <View style={styles.adminContent}>
+                                    <AppText style={styles.adminTitle}>My Class & Students</AppText>
+                                    <AppText variant="caption" style={styles.adminSubtitle}>Manage Students, View Class Details</AppText>
+                                </View>
+                                <Ionicons name="chevron-forward" size={24} color={COLORS.textLight} />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                style={styles.adminCard} 
+                                onPress={() => router.push('/manage-subjects')}
+                            >
+                                <View style={[styles.adminIconContainer, { backgroundColor: COLORS.warning }]}>
+                                    <Ionicons name="book" size={24} color={COLORS.white} />
+                                </View>
+                                <View style={styles.adminContent}>
+                                    <AppText style={styles.adminTitle}>Manage Subjects</AppText>
+                                    <AppText variant="caption" style={styles.adminSubtitle}>Add Subjects, Assign Faculty</AppText>
+                                </View>
+                                <Ionicons name="chevron-forward" size={24} color={COLORS.textLight} />
+                            </TouchableOpacity>
+                        </>
                     )}
 
                 </View>

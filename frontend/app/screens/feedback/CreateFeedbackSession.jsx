@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, TouchableOpacity, ScrollView, TextInput, Modal, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
@@ -7,6 +7,7 @@ import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
 import { wp, hp } from '../../utils/responsive';
+import { getMyProfile } from '../../services/api';
 
 // Mock Student Data for the visual pool
 const STUDENT_POOL = [
@@ -20,9 +21,35 @@ const STUDENT_POOL = [
 
 const CreateFeedbackSession = () => {
     const router = useRouter();
-    const [subject, setSubject] = useState('Data Structures');
-    const [date, setDate] = useState('Today, Oct 15');
-    const [topic, setTopic] = useState('Graph Traversal');
+    
+    // State
+    const [mySubjects, setMySubjects] = useState([]);
+    const [selectedSubject, setSelectedSubject] = useState(null);
+    const [date, setDate] = useState('Today, Oct 15'); // Keep static for now
+    const [topic, setTopic] = useState('');
+    
+    // Modals
+    const [subjectModalVisible, setSubjectModalVisible] = useState(false);
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        try {
+            const data = await getMyProfile();
+            if (data.user && data.user.subjects) {
+                setMySubjects(data.user.subjects);
+            }
+        } catch (error) {
+            console.log("Error fetching profile", error);
+        }
+    };
+
+    const handleSelectSubject = (subject) => {
+        setSelectedSubject(subject);
+        setSubjectModalVisible(false);
+    };
 
     return (
         <ScreenWrapper backgroundColor={COLORS.surfaceLight} withPadding={false}>
@@ -40,11 +67,16 @@ const CreateFeedbackSession = () => {
                 <View style={styles.card}>
                     <AppText variant="h3" style={styles.cardTitle}>Session Details</AppText>
                     
-                    {/* Subject Input (Mock Dropdown) */}
+                    {/* Subject Input */}
                     <View style={styles.inputGroup}>
                         <AppText variant="caption" style={styles.label}>Subject</AppText>
-                        <TouchableOpacity style={styles.dropdownInput}>
-                            <AppText style={styles.inputText}>{subject}</AppText>
+                        <TouchableOpacity 
+                            style={styles.dropdownInput}
+                            onPress={() => setSubjectModalVisible(true)}
+                        >
+                            <AppText style={[styles.inputText, !selectedSubject && {color: COLORS.textLight}]}>
+                                {selectedSubject ? selectedSubject.name : "Select Subject"}
+                            </AppText>
                             <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
                         </TouchableOpacity>
                     </View>
@@ -66,6 +98,7 @@ const CreateFeedbackSession = () => {
                                 style={styles.textInput}
                                 value={topic}
                                 onChangeText={setTopic}
+                                placeholder="Enter topic name..."
                             />
                         </View>
                     </View>
@@ -106,10 +139,46 @@ const CreateFeedbackSession = () => {
 
             {/* Bottom Button */}
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.generateButton} onPress={() => console.log('Generate')}>
+                <TouchableOpacity style={styles.generateButton} onPress={() => console.log('Generate', {selectedSubject, topic})}>
                     <AppText style={styles.generateButtonText}>Generate Feedback Request</AppText>
                 </TouchableOpacity>
             </View>
+
+            {/* Subject Selection Modal */}
+            <Modal visible={subjectModalVisible} transparent animationType="slide">
+                 <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <AppText variant="h3" style={{marginBottom: 16}}>Select Subject</AppText>
+                        
+                        {mySubjects.length > 0 ? (
+                            <FlatList 
+                                data={mySubjects}
+                                keyExtractor={item => item.id}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity 
+                                        style={styles.modalOption} 
+                                        onPress={() => handleSelectSubject(item)}
+                                    >
+                                        <AppText style={styles.modalOptionText}>{item.name}</AppText>
+                                        {selectedSubject?.id === item.id && <Ionicons name="checkmark" size={20} color={COLORS.primary} />}
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        ) : (
+                            <AppText style={{color: COLORS.textSecondary, fontStyle: 'italic', marginBottom: 20}}>
+                                No assigned subjects found. Please contact your coordinator.
+                            </AppText>
+                        )}
+
+                        <TouchableOpacity 
+                            style={[styles.generateButton, {marginTop: 10}]} 
+                            onPress={() => setSubjectModalVisible(false)}
+                        >
+                            <AppText style={{color: COLORS.white, fontWeight: 'bold'}}>Close</AppText>
+                        </TouchableOpacity>
+                    </View>
+                 </View>
+            </Modal>
 
         </ScreenWrapper>
     );
@@ -258,8 +327,30 @@ const styles = StyleSheet.create({
         color: COLORS.white,
         fontSize: 18,
         fontWeight: '600',
+    },
+    modalOverlay: {
+       flex: 1,
+       backgroundColor: 'rgba(0,0,0,0.5)',
+       justifyContent: 'center',
+       padding: 20
+    },
+    modalContent: {
+       backgroundColor: COLORS.white,
+       borderRadius: 12,
+       padding: 24,
+       maxHeight: '50%'
+    },
+    modalOption: {
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+        flexDirection: 'row',
+        justifyContent: 'space-between'
+    },
+    modalOptionText: {
+        fontSize: 16,
+        color: COLORS.textPrimary
     }
-
 });
 
 export default CreateFeedbackSession;

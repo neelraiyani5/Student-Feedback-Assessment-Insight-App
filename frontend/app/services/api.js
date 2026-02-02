@@ -6,7 +6,7 @@ import * as SecureStore from 'expo-secure-store';
 // For iOS Simulator use 'http://localhost:3002'
 // For Android Emulator use 'http://10.0.2.2:3002'
 // For Physical Device use your machine's IP: 'http://192.168.x.x:3002'
-const BASE_URL = 'http://192.168.1.7:3001'; 
+const BASE_URL = 'http://192.168.1.120:3001'; 
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -201,6 +201,141 @@ export const assignStudentPool = async (studentId, poolId) => {
   } catch (error) {
     throw error.response ? error.response.data : error;
   }
+};
+
+export const createSubject = async (name) => {
+  try {
+    const response = await api.post('/class/subject/create', { name });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const getSubjects = async () => {
+  try {
+    const response = await api.get('/class/subjects');
+    return response.data; // { subjects: [...] }
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const assignFacultyToSubject = async (subjectId, facultyIds) => {
+  try {
+    const response = await api.patch('/class/subject/assign-faculty', { subjectId, facultyIds });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const getSubjectClasses = async (subjectId) => {
+  try {
+    const response = await api.get(`/class/subject/${subjectId}/classes`);
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const createAssessment = async (data) => {
+    try {
+        const response = await api.post('/class/assessment/create', data);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error;
+    }
+};
+
+export const getFacultyAssessments = async () => {
+    try {
+        const response = await api.get('/class/assessments/list');
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error;
+    }
+};
+
+export const getAssessmentMarks = async (id) => {
+    try {
+        const response = await api.get(`/class/assessment/${id}/details`);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error;
+    }
+};
+
+export const updateAssessmentMarks = async (assessmentId, marksData) => {
+    try {
+        const response = await api.patch('/class/assessment/marks/update', { assessmentId, marksData });
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error;
+    }
+};
+
+export const getStudentSubjects = async () => {
+    try {
+        const response = await api.get('/class/student/subjects');
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error;
+    }
+};
+
+export const getStudentSubjectPerformance = async (subjectId) => {
+    try {
+        const response = await api.get(`/class/student/subject/${subjectId}/performance`);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error;
+    }
+};
+
+export const deleteUser = async (id) => {
+    try {
+        const response = await api.delete(`/class/user/delete/${id}`);
+        return response.data;
+    } catch (error) {
+         throw error.response ? error.response.data : error;
+    }
+};
+
+export const updateSubject = async (id, data) => {
+    try {
+         const response = await api.patch(`/class/subject/update/${id}`, data);
+         return response.data;
+    } catch (error) {
+         throw error.response ? error.response.data : error;
+    }
+};
+
+export const deleteSubject = async (id) => {
+    try {
+        const response = await api.delete(`/class/subject/delete/${id}`);
+        return response.data;
+    } catch (error) {
+         throw error.response ? error.response.data : error;
+    }
+};
+
+export const updateAssessment = async (id, data) => {
+    try {
+         const response = await api.patch(`/class/assessment/update/${id}`, data);
+         return response.data;
+    } catch (error) {
+         throw error.response ? error.response.data : error;
+    }
+};
+
+export const deleteAssessment = async (id) => {
+    try {
+        const response = await api.delete(`/class/assessment/delete/${id}`);
+        return response.data;
+    } catch (error) {
+         throw error.response ? error.response.data : error;
+    }
 };
 
 export default api;

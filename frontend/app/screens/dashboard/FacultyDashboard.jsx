@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity, FlatList } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,13 +8,7 @@ import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
 import { wp, hp } from '../../utils/responsive';
-
-// Mock Data
-const SUBJECTS = [
-  { id: '1', name: 'Data Structures', code: 'CS301', icon: 'server', color: '#4F46E5' },
-  { id: '2', name: 'Operating Systems', code: 'IT402', icon: 'desktop', color: '#7C3AED' },
-  { id: '3', name: 'AI', code: 'CS505', icon: 'hardware-chip', color: '#059669' },
-];
+import { getMyProfile } from '../../services/api';
 
 const DEADLINES = [
   { id: '1', title: 'CO-PO Mapping - Due Tomorrow', date: 'Oct 16, 11:59 PM', type: 'urgent' },
@@ -28,6 +22,33 @@ const ACTIVITIES = [
 const FacultyDashboard = () => {
     const router = useRouter();
     const { name } = useLocalSearchParams();
+    const [subjects, setSubjects] = useState([]);
+    const [user, setUser] = useState(null);
+
+    useEffect(() => {
+        fetchProfile();
+    }, []);
+
+    const fetchProfile = async () => {
+        try {
+            const data = await getMyProfile();
+            if (data.user) {
+                setUser(data.user);
+                if (data.user.subjects) {
+                     const formatted = data.user.subjects.map((s, index) => ({
+                        id: s.id,
+                        name: s.name,
+                        code: s.name.substring(0, 4).toUpperCase(),
+                        icon: 'book',
+                        color: index % 2 === 0 ? '#4F46E5' : '#7C3AED' // Alternating colors
+                    }));
+                    setSubjects(formatted);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to fetch profile", error);
+        }
+    };
 
     const renderSubjectCard = ({ item }) => (
         <TouchableOpacity style={[styles.subjectCard, { backgroundColor: item.color }]} onPress={() => router.push('/course-checklist')}>
@@ -49,11 +70,11 @@ const FacultyDashboard = () => {
                 <View style={styles.header}>
                     <View>
                         <AppText variant="h2" style={styles.greeting}>Hello,</AppText>
-                        <AppText variant="h2" style={styles.userName}>{name || 'Prof. Sharma'}.</AppText>
+                        <AppText variant="h2" style={styles.userName}>{user?.name || name || 'Faculty'}.</AppText>
                     </View>
                     <TouchableOpacity onPress={() => router.push('/profile')}>
                         <Image 
-                            source="https://randomuser.me/api/portraits/women/44.jpg" // Placeholder
+                            source="https://randomuser.me/api/portraits/women/44.jpg" 
                             style={styles.profileImage}
                             contentFit="cover"
                         />
@@ -62,15 +83,54 @@ const FacultyDashboard = () => {
 
                 {/* My Subjects Section */}
                 <View style={styles.section}>
-                    <AppText variant="h3" style={styles.sectionTitle}>My Subjects</AppText>
-                    <FlatList 
-                        data={SUBJECTS}
-                        renderItem={renderSubjectCard}
-                        keyExtractor={item => item.id}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.subjectsList}
-                    />
+                    <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center', paddingHorizontal: SPACING.l, marginBottom: SPACING.m}}>
+                        <AppText variant="h3" style={{color: COLORS.textPrimary}}>My Subjects</AppText>
+                        <TouchableOpacity onPress={() => router.push('/create-assessment')} style={{flexDirection:'row', alignItems:'center'}}>
+                            <Ionicons name="add-circle" size={20} color={COLORS.primary} style={{marginRight: 4}}/>
+                            <AppText style={{color: COLORS.primary, fontWeight:'600'}}>Assessment</AppText>
+                        </TouchableOpacity>
+                    </View>
+                    {subjects.length > 0 ? (
+                        <FlatList 
+                            data={subjects}
+                            renderItem={renderSubjectCard}
+                            keyExtractor={item => item.id}
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.subjectsList}
+                        />
+                    ) : (
+                        <View style={{paddingHorizontal: SPACING.l}}>
+                            <AppText style={{color: COLORS.textSecondary, fontStyle: 'italic'}}>No subjects assigned yet.</AppText>
+                        </View>
+                    )}
+                </View>
+
+                {/* Assessments Section */}
+                <View style={[styles.section, {paddingHorizontal: SPACING.l}]}>
+                     <View style={{flexDirection:'row', justifyContent:'space-between', marginBottom: SPACING.m}}>
+                        <AppText variant="h3">Assessments</AppText>
+                        <TouchableOpacity onPress={() => router.push('/assessments')}>
+                            <AppText style={{color: COLORS.primary}}>View All</AppText>
+                        </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity 
+                        style={[styles.taskCard, {borderColor: COLORS.primary}]}
+                        onPress={() => router.push('/assessments')}
+                    >
+                         <View style={{flexDirection:'row', alignItems:'center', gap: 12}}>
+                             <View style={{padding:8, backgroundColor: COLORS.primary+'20', borderRadius:8}}>
+                                <Ionicons name="clipboard" size={24} color={COLORS.primary} />
+                             </View>
+                             <View>
+                                 <AppText style={{fontSize:16, fontWeight:'600'}}>Review & Add Marks</AppText>
+                                 <AppText variant="caption" style={{color: COLORS.textSecondary}}>Manage IA, CSE, and ESE marks</AppText>
+                             </View>
+                             <View style={{flex:1, alignItems:'flex-end'}}>
+                                 <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+                             </View>
+                         </View>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Pending Deadlines Section */}

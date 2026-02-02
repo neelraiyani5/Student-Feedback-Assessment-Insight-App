@@ -7,7 +7,7 @@ import * as Clipboard from 'expo-clipboard';
 import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
-import { getUsers, createUser } from '../../services/api';
+import { getUsers, createUser, deleteUser } from '../../services/api';
 
 const ManageFacultyScreen = () => {
   const router = useRouter();
@@ -69,6 +69,28 @@ const ManageFacultyScreen = () => {
     }
   };
 
+  const handleDeleteUser = (user) => {
+      Alert.alert(
+          "Delete User",
+          `Are you sure you want to delete ${user.name}? This action cannot be undone.`,
+          [
+              { text: "Cancel", style: "cancel" },
+              { text: "Delete", style: 'destructive', onPress: async () => {
+                  try {
+                      setLoading(true);
+                      await deleteUser(user.id);
+                      Alert.alert("Success", "User deleted successfully");
+                      fetchFaculty(); // Refresh list
+                  } catch(err) {
+                       Alert.alert("Error", "Failed to delete user");
+                       console.log(err);
+                       setLoading(false);
+                  }
+              }}
+          ]
+      );
+  };
+
   const copyToClipboard = async () => {
       if (createdUser?.password) {
           await Clipboard.setStringAsync(createdUser.password);
@@ -98,7 +120,12 @@ const ManageFacultyScreen = () => {
         <AppText style={styles.subtitle}>{item.userId} • {item.email}</AppText>
         <AppText style={styles.roleBadge}>{item.role}</AppText>
       </View>
-      <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+      <View style={{flexDirection:'row', alignItems:'center'}}>
+          <TouchableOpacity onPress={() => handleDeleteUser(item)} style={{padding:8, marginRight: 4}}>
+              <Ionicons name="trash-outline" size={22} color={COLORS.error} />
+          </TouchableOpacity>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+      </View>
     </TouchableOpacity>
   );
 

@@ -29,7 +29,7 @@ export const login = async (req, res) => {
 export const getme = async (req, res) => {
     const user = await prisma.user.findUnique({
         where: { id: req.user.id },
-        include: { hodDepartments: true }
+        include: { hodDepartments: true, subjects: true }
     });
     res.status(200).json({ user });
 }

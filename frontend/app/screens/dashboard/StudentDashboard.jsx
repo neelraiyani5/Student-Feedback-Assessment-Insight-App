@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,17 +8,25 @@ import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
 import { wp, hp } from '../../utils/responsive';
-
-// Mock Data
-const UPCOMING_CLASSES = [
-  { id: '1', time: '10:00 AM', subject: 'Data Structures', location: 'Room 302' },
-  { id: '2', time: '11:30 AM', subject: 'Operating Systems', location: 'Lab 4' },
-  { id: '3', time: '02:00 PM', subject: 'Artificial Intelligence', location: 'Room 305' },
-];
+import { getStudentSubjects } from '../../services/api';
 
 const StudentDashboard = () => {
     const router = useRouter();
     const { name } = useLocalSearchParams();
+    const [subjects, setSubjects] = useState([]);
+
+    useEffect(() => {
+        fetchSubjects();
+    }, []);
+
+    const fetchSubjects = async () => {
+        try {
+            const data = await getStudentSubjects();
+            setSubjects(data.subjects || []);
+        } catch (error) {
+            console.log("Error fetching subjects", error);
+        }
+    };
 
     return (
         <ScreenWrapper backgroundColor={COLORS.surfaceLight} withPadding={false}>
@@ -28,11 +36,11 @@ const StudentDashboard = () => {
                 <View style={styles.header}>
                     <View>
                         <AppText variant="h2" style={styles.greeting}>Welcome,</AppText>
-                        <AppText variant="h2" style={styles.userName}>{name || 'Neel'}</AppText>
+                        <AppText variant="h2" style={styles.userName}>{name || 'Student'}</AppText>
                     </View>
                     <TouchableOpacity onPress={() => router.push('/profile')}>
                         <Image 
-                            source="https://randomuser.me/api/portraits/men/32.jpg" // Placeholder for Neel
+                            source="https://randomuser.me/api/portraits/men/32.jpg" // Placeholder
                             style={styles.profileImage}
                             contentFit="cover"
                         />
@@ -45,18 +53,13 @@ const StudentDashboard = () => {
                         <Ionicons name="alert-circle" size={32} color={COLORS.accent} style={styles.heroIcon} />
                         <View style={styles.heroTextContainer}>
                             <AppText variant="h3" style={styles.heroTitle}>Action Required</AppText>
-                            <AppText style={styles.heroSubtitle}>2 Pending Feedback Requests</AppText>
+                            <AppText style={styles.heroSubtitle}>Check your performance</AppText>
                         </View>
                     </View>
-                    <TouchableOpacity style={styles.completeButton} onPress={() => router.push('/lecture-feedback')}>
-                        <AppText style={styles.completeButtonText}>Complete Now</AppText>
-                        <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
-                    </TouchableOpacity>
                 </View>
 
                 {/* Stats Section */}
                 <View style={styles.statsContainer}>
-                    {/* Attendance Card */}
                     <View style={[styles.statCard, { backgroundColor: '#E0F2FE' }]}> 
                         <View style={styles.statIconBg}>
                             <Ionicons name="calendar" size={20} color="#0284C7" />
@@ -65,40 +68,42 @@ const StudentDashboard = () => {
                         <AppText variant="h2" style={{ color: '#0C4A6E', marginTop: SPACING.xs }}>85%</AppText>
                     </View>
 
-                    {/* Rank Card */}
-                    <TouchableOpacity  style={[styles.statCard, { backgroundColor: '#DBEAFE' }]} onPress={() => router.push('/performance-analytics')}>
+                    <TouchableOpacity  
+                        style={[styles.statCard, { backgroundColor: '#DBEAFE' }]} 
+                        onPress={() => {}}
+                    >
                         <View style={[styles.statIconBg, { backgroundColor: 'rgba(37, 99, 235, 0.2)' }]}>
                             <Ionicons name="trophy" size={20} color="#2563EB" />
                         </View>
-                        <AppText variant="caption" style={{ color: '#2563EB' }}>Current Rank</AppText>
-                        <AppText variant="h2" style={{ color: '#1E3A8A', marginTop: SPACING.xs }}>Top 15%</AppText>
+                        <AppText variant="caption" style={{ color: '#2563EB' }}>Overall Rank</AppText>
+                        <AppText variant="h2" style={{ color: '#1E3A8A', marginTop: SPACING.xs }}>-</AppText>
                     </TouchableOpacity >
                 </View>
 
-                {/* Upcoming Classes List */}
+                {/* My Subjects List */}
                 <View style={styles.section}>
-                    <AppText variant="h3" style={styles.sectionTitle}>Upcoming Classes</AppText>
+                    <AppText variant="h3" style={styles.sectionTitle}>My Subjects</AppText>
                     
-                    {UPCOMING_CLASSES.map((item, index) => (
-                        <View key={item.id} style={styles.classCard}>
-                            <View style={styles.timeContainer}>
-                                <AppText style={styles.timeText}>{item.time}</AppText>
-                                <View style={styles.timeLine} />
-                            </View>
+                    {subjects.length > 0 ? subjects.map((item) => (
+                        <TouchableOpacity 
+                            key={item.id} 
+                            style={styles.classCard}
+                            onPress={() => router.push(`/student/subject/${item.id}`)}
+                        >
+                             <View style={{padding:12, backgroundColor: COLORS.primary + '15', borderRadius:10, marginRight:16}}>
+                                 <Ionicons name="book" size={24} color={COLORS.primary} />
+                             </View>
                             <View style={styles.classDetails}>
-                                <AppText style={styles.className}>{item.subject}</AppText>
-                                <View style={styles.locationContainer}>
-                                    <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
-                                    <AppText variant="caption" style={styles.locationText}>{item.location}</AppText>
-                                </View>
+                                <AppText style={styles.className}>{item.name}</AppText>
+                                <AppText variant="caption" style={{color: COLORS.textSecondary}}>View Performance & Insights</AppText>
                             </View>
-                            {index === 0 && (
-                                <View style={styles.nowBadge}>
-                                    <AppText variant="small" style={styles.nowText}>NOW</AppText>
-                                </View>
-                            )}
+                            <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+                        </TouchableOpacity>
+                    )) : (
+                        <View style={{paddingVertical: 20, alignItems: 'center'}}>
+                            <AppText style={{color: COLORS.textSecondary}}>No subjects assigned yet.</AppText>
                         </View>
-                    ))}
+                    )}
                 </View>
 
             </ScrollView>
@@ -138,7 +143,7 @@ const styles = StyleSheet.create({
         borderRadius: LAYOUT.radius.l,
         padding: SPACING.l,
         marginBottom: SPACING.xl,
-        shadowColor: COLORS.accent, // Orange shadow hint
+        shadowColor: COLORS.accent, 
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.15,
         shadowRadius: 10,
@@ -149,7 +154,6 @@ const styles = StyleSheet.create({
     heroContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: SPACING.m,
     },
     heroIcon: {
         marginRight: SPACING.m,
@@ -164,19 +168,6 @@ const styles = StyleSheet.create({
     heroSubtitle: {
         color: COLORS.textSecondary,
     },
-    completeButton: {
-        backgroundColor: COLORS.accent, // Orange
-        borderRadius: LAYOUT.radius.m,
-        paddingVertical: 12,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    completeButtonText: {
-        color: COLORS.white,
-        fontWeight: '600',
-        marginRight: SPACING.s,
-    },
     statsContainer: {
         flexDirection: 'row',
         paddingHorizontal: SPACING.l,
@@ -189,6 +180,7 @@ const styles = StyleSheet.create({
         borderRadius: LAYOUT.radius.xl,
         alignItems: 'flex-start',
         justifyContent: 'center',
+        height: 120
     },
     statIconBg: {
         backgroundColor: 'rgba(255,255,255,0.5)',
@@ -211,23 +203,13 @@ const styles = StyleSheet.create({
         borderRadius: LAYOUT.radius.l,
         marginBottom: SPACING.m,
         alignItems: 'center',
+        elevation: 2,
+        shadowColor: "#000",
+        shadowOffset: {width:0, height:2},
+        shadowOpacity:0.05,
+        shadowRadius:4,
         borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    timeContainer: {
-        alignItems: 'center',
-        marginRight: SPACING.m,
-        width: 70,
-    },
-    timeText: {
-        fontWeight: '600',
-        color: COLORS.textPrimary,
-        marginBottom: 4,
-    },
-    timeLine: {
-        width: 2,
-        height: 20,
-        backgroundColor: COLORS.surface,
+        borderColor: COLORS.border
     },
     classDetails: {
         flex: 1,
@@ -237,25 +219,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: COLORS.textPrimary,
         marginBottom: 4,
-    },
-    locationContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    locationText: {
-        color: COLORS.textSecondary,
-        marginLeft: 4,
-    },
-    nowBadge: {
-        backgroundColor: '#DCFCE7', // Light green
-        paddingHorizontal: SPACING.s,
-        paddingVertical: 2,
-        borderRadius: LAYOUT.radius.s,
-    },
-    nowText: {
-        color: '#166534', // Green text
-        fontWeight: 'bold',
-        fontSize: 10,
     }
 });
 

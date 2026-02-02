@@ -46,7 +46,8 @@ model User {
   class   Class? @relation("Class_Students", fields: [classId], references: [id],  onDelete: NoAction, onUpdate: NoAction)
   poolId   String? @db.ObjectId
   pool     StudentPool? @relation(fields: [poolId], references: [id])
-  subjects       Subject[]    @relation("Faculty_Subject")
+  subjectIds String[] @db.ObjectId
+  subjects   Subject[] @relation(fields: [subjectIds], references: [id])
   marks Marks[]
   mustChangePassword Boolean @default(true)
   createdAt DateTime @default(now())
@@ -95,8 +96,8 @@ model Subject {
   name       String
   semester   Semester @relation(fields: [semesterId], references: [id])
   semesterId String   @db.ObjectId
-  faculty    User?    @relation("Faculty_Subject", fields: [facultyId], references: [id])
-  facultyId  String?  @db.ObjectId
+  facultyIds String[] @db.ObjectId
+  faculties  User[]   @relation(fields: [facultyIds], references: [id])
   assessments Assessment[]
   createdAt  DateTime @default(now())
 
