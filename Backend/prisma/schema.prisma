@@ -155,6 +155,24 @@ model CourseFileTaskSubmission {
   @@unique([assignmentId, templateId])
 }
 
+model CourseFileLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  action      String   // e.g., "TASK_COMPLETED", "CC_REVIEWED", "HOD_REVIEWED", "FACULTY_ASSIGNED"
+  message     String   // Human-readable message
+  userName    String   // Who did it
+  userId      String   @db.ObjectId
+  
+  // Context
+  className   String?
+  subjectName String?
+  taskTitle   String?
+  
+  metadata    Json?    // Optional extra info (remarks, status, etc.)
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 
 model Department {
   id        String     @id @default(auto()) @map("_id") @db.ObjectId

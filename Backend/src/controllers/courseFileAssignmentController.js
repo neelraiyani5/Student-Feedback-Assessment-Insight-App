@@ -1,4 +1,5 @@
 import prisma from "../prisma/client.js";
+import { createCourseFileLog } from "../utils/courseFileLogger.js";
 
 export const assignSubjectFaculty = async (req, res) => {
     try {
@@ -43,6 +44,20 @@ export const assignSubjectFaculty = async (req, res) => {
             data: submissions
         });
 
+        // 4. Log the action
+        const subject = await prisma.subject.findUnique({ where: { id: subjectId } });
+        const faculty = await prisma.user.findUnique({ where: { id: facultyId } });
+        const classInfo = await prisma.class.findUnique({ where: { id: classId } });
+
+        await createCourseFileLog({
+            action: "FACULTY_ASSIGNED",
+            message: `CC assigned ${faculty?.name} to subject ${subject?.name} for class ${classInfo?.name}`,
+            user: { id: req.user.id, name: req.user.name },
+            className: classInfo?.name,
+            subjectName: subject?.name,
+            metadata: { facultyName: faculty?.name }
+        });
+
         res.status(201).json({ message: "Subject assigned and tasks initialized", assignment });
     } catch (error) {
         if (error.code === 'P2002') {
@@ -79,8 +94,23 @@ export const getClassAssignments = async (req, res) => {
 export const deleteAssignment = async (req, res) => {
     try {
         const { id } = req.params;
-        // Cascade delete would be ideal, but we'll do it manually if needed or rely on schema
+        const existingAssignment = await prisma.courseFileAssignment.findUnique({
+            where: { id },
+            include: { subject: true, faculty: true, class: true }
+        });
+
         await prisma.courseFileAssignment.delete({ where: { id } });
+
+        if (existingAssignment) {
+            await createCourseFileLog({
+                action: "ASSIGNMENT_DELETED",
+                message: `CC deleted assignment of ${existingAssignment.faculty.name} for ${existingAssignment.subject.name} in ${existingAssignment.class.name}`,
+                user: { id: req.user.id, name: req.user.name },
+                className: existingAssignment.class.name,
+                subjectName: existingAssignment.subject.name
+            });
+        }
+
         res.status(200).json({ message: "Assignment deleted successfully" });
     } catch (error) {
         res.status(500).json({ message: "Failed to delete assignment" });

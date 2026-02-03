@@ -1,4 +1,5 @@
 import prisma from "../prisma/client.js";
+import { createCourseFileLog } from "../utils/courseFileLogger.js";
 
 export const getFacultyTasks = async (req, res) => {
     try {
@@ -43,7 +44,25 @@ export const completeTask = async (req, res) => {
             data: {
                 status: 'COMPLETED',
                 completedAt: new Date()
+            },
+            include: {
+                template: { select: { title: true } },
+                assignment: {
+                    include: {
+                        subject: { select: { name: true } },
+                        class: { select: { name: true } }
+                    }
+                }
             }
+        });
+
+        await createCourseFileLog({
+            action: "TASK_COMPLETED",
+            message: `Faculty marked task "${updatedTask.template.title}" as COMPLETED`,
+            user: { id: req.user.id, name: req.user.name },
+            className: updatedTask.assignment.class.name,
+            subjectName: updatedTask.assignment.subject.name,
+            taskTitle: updatedTask.template.title
         });
 
         res.status(200).json(updatedTask);
@@ -89,7 +108,34 @@ export const reviewTask = async (req, res) => {
 
         const updatedTask = await prisma.courseFileTaskSubmission.update({
             where: { id: taskId },
-            data: updateData
+            data: updateData,
+            include: {
+                template: { select: { title: true } },
+                assignment: {
+                    include: {
+                        subject: { select: { name: true } },
+                        class: { select: { name: true } },
+                        faculty: { select: { name: true } }
+                    }
+                }
+            }
+        });
+
+        const actionType = role === 'HOD' ? "HOD_REVIEWED" : "CC_REVIEWED";
+        const reviewerRole = role === 'HOD' ? "HOD" : "CC";
+
+        await createCourseFileLog({
+            action: actionType,
+            message: `${reviewerRole} reviewed task "${updatedTask.template.title}" as ${status}`,
+            user: { id: req.user.id, name: req.user.name },
+            className: updatedTask.assignment.class.name,
+            subjectName: updatedTask.assignment.subject.name,
+            taskTitle: updatedTask.template.title,
+            metadata: {
+                status: status,
+                remarks: remarks,
+                facultyName: updatedTask.assignment.faculty.name
+            }
         });
 
         res.status(200).json(updatedTask);

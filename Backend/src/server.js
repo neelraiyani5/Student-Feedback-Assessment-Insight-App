@@ -16,6 +16,7 @@ import feedbackSessionRoutes from "./routes/feedbackSessionRoutes.js";
 import courseFileTemplateRoutes from "./routes/courseFileTemplateRoutes.js";
 import courseFileAssignmentRoutes from "./routes/courseFileAssignmentRoutes.js";
 import courseFileSubmissionRoutes from "./routes/courseFileSubmissionRoutes.js";
+import courseFileLogRoutes from "./routes/courseFileLogRoutes.js";
 dotenv.config();
 
 const port = process.env.PORT || 3002;
@@ -40,6 +41,7 @@ app.use('/feedback-session', feedbackSessionRoutes);
 app.use('/course-file', courseFileTemplateRoutes);
 app.use('/course-file-assignment', courseFileAssignmentRoutes);
 app.use('/course-file-submission', courseFileSubmissionRoutes);
+app.use('/course-file-log', courseFileLogRoutes);
 
 app.listen(port, () => {
     console.log(`Server running on "http://localhost:${port}"`);
