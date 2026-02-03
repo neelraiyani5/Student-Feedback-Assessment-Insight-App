@@ -51,6 +51,7 @@ model User {
   marks Marks[]
   feedbackSessions FeedbackSession[]
   feedbackResponses FeedbackResponse[]
+  courseFileAssignments CourseFileAssignment[]
   mustChangePassword Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -101,6 +102,59 @@ model FeedbackResponse {
   @@unique([sessionId, studentId])
 }
 
+model CourseFileTaskTemplate {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  submissions CourseFileTaskSubmission[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CourseFileAssignment {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  classId     String   @db.ObjectId
+  class       Class    @relation(fields: [classId], references: [id])
+  subjectId   String   @db.ObjectId
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+  facultyId   String   @db.ObjectId
+  faculty     User     @relation(fields: [facultyId], references: [id])
+  
+  tasks       CourseFileTaskSubmission[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([classId, subjectId]) // Only one faculty per subject in a class
+}
+
+model CourseFileTaskSubmission {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  assignmentId  String   @db.ObjectId
+  assignment    CourseFileAssignment @relation(fields: [assignmentId], references: [id])
+  templateId    String   @db.ObjectId
+  template      CourseFileTaskTemplate @relation(fields: [templateId], references: [id])
+  
+  status        String   @default("PENDING") // PENDING, COMPLETED
+  deadline      DateTime
+  
+  ccStatus      String   @default("PENDING") // PENDING, YES, NO
+  ccRemarks     String?
+  ccReviewDate  DateTime?
+  
+  hodStatus      String   @default("PENDING") // PENDING, YES, NO
+  hodRemarks     String?
+  hodReviewDate  DateTime?
+  
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([assignmentId, templateId])
+}
+
 
 model Department {
   id        String     @id @default(auto()) @map("_id") @db.ObjectId
@@ -134,6 +188,7 @@ model Class {
   pools      StudentPool[]
   assessments Assessment[]
   feedbackSessions FeedbackSession[]
+  courseFileAssignments CourseFileAssignment[]
   createdAt  DateTime @default(now())
 
   @@unique([name, semesterId])
@@ -149,6 +204,7 @@ model Subject {
   faculties  User[]   @relation(fields: [facultyIds], references: [id])
   assessments Assessment[]
   feedbackSessions FeedbackSession[]
+  courseFileAssignments CourseFileAssignment[]
   createdAt  DateTime @default(now())
 
   @@unique([name, semesterId], name: "name_semesterId")
