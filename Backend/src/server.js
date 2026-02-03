@@ -11,6 +11,8 @@ import classRoutes from "./routes/classRoutes.js";
 import subjectRoutes from "./routes/subjectRoutes.js";
 import assessmentRoutes from "./routes/assessmentRoutes.js";
 import marksRoutes from "./routes/marksRoutes.js";
+import feedbackTemplateRoutes from "./routes/feedbackTemplateRoutes.js";
+import feedbackSessionRoutes from "./routes/feedbackSessionRoutes.js";
 dotenv.config();
 
 const port = process.env.PORT || 3002;
@@ -30,6 +32,8 @@ app.use('/class', classRoutes);
 app.use('/subject', subjectRoutes);
 app.use('/assessment', assessmentRoutes);
 app.use('/marks', marksRoutes);
+app.use('/feedback-template', feedbackTemplateRoutes);
+app.use('/feedback-session', feedbackSessionRoutes);
 
 app.listen(port, () => {
     console.log(`Server running on "http://localhost:${port}"`);

@@ -49,8 +49,56 @@ model User {
   subjectIds String[] @db.ObjectId
   subjects   Subject[] @relation(fields: [subjectIds], references: [id])
   marks Marks[]
+  feedbackSessions FeedbackSession[]
+  feedbackResponses FeedbackResponse[]
   mustChangePassword Boolean @default(true)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FeedbackTemplate {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  questions   Json     // Array of { question: string, options: string[] }
+  isActive    Boolean  @default(true)
+  sessions    FeedbackSession[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FeedbackSession {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  title        String   // Heading provided by faculty
+  templateId   String   @db.ObjectId
+  template     FeedbackTemplate @relation(fields: [templateId], references: [id])
+  facultyId    String   @db.ObjectId
+  faculty      User     @relation(fields: [facultyId], references: [id])
+  classId      String   @db.ObjectId
+  class        Class    @relation(fields: [classId], references: [id])
+  subjectId    String   @db.ObjectId
+  subject      Subject  @relation(fields: [subjectId], references: [id])
+  
+  assignedStudentIds String[] @db.ObjectId // Selected random students
+  
+  expiresAt    DateTime // Set to end of the day
+  createdAt    DateTime @default(now())
+  
+  responses    FeedbackResponse[]
+
+  @@index([expiresAt])
+}
+
+model FeedbackResponse {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionId    String   @db.ObjectId
+  session      FeedbackSession @relation(fields: [sessionId], references: [id])
+  studentId    String   @db.ObjectId
+  student      User     @relation(fields: [studentId], references: [id])
+  answers      Json     // Array of { question: string, answer: string }
+  createdAt    DateTime @default(now())
+
+  @@unique([sessionId, studentId])
 }
 
 
@@ -85,6 +133,7 @@ model Class {
   students   User[]   @relation("Class_Students")
   pools      StudentPool[]
   assessments Assessment[]
+  feedbackSessions FeedbackSession[]
   createdAt  DateTime @default(now())
 
   @@unique([name, semesterId])
@@ -99,6 +148,7 @@ model Subject {
   facultyIds String[] @db.ObjectId
   faculties  User[]   @relation(fields: [facultyIds], references: [id])
   assessments Assessment[]
+  feedbackSessions FeedbackSession[]
   createdAt  DateTime @default(now())
 
   @@unique([name, semesterId], name: "name_semesterId")
