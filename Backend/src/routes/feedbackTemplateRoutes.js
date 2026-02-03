@@ -37,8 +37,8 @@ const templateValidation = [
     validate
 ];
 
-router.post("/create", role("HOD"), templateValidation, createTemplate);
-router.patch("/update/:id", role("HOD"), templateValidation, updateTemplate);
+router.post("/create", role("HOD"), templateValidation, validate, createTemplate);
+router.patch("/update/:id", role("HOD"), templateValidation, validate, updateTemplate);
 router.delete("/delete/:id", role("HOD"), deleteTemplate);
 
 router.get("/list", getTemplates);
