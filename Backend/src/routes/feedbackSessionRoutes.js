@@ -3,7 +3,8 @@ import {
     startFeedbackSession,
     getStudentSessions,
     submitFeedback,
-    getSessionResponses
+    getSessionResponses,
+    getAllSessions
 } from "../controllers/feedbackSessionController.js";
 import auth from "../middlewares/auth.js";
 import role from "../middlewares/role.js";
@@ -21,7 +22,10 @@ router.get("/student/active", role("STUDENT"), getStudentSessions);
 // Students submit feedback
 router.post("/submit", role("STUDENT"), submitFeedback);
 
+// List all sessions (Monitoring)
+router.get("/list", role("HOD", "CC", "FACULTY"), getAllSessions);
+
 // CC or higher views responses
-router.get("/responses/:sessionId", role("CC", "HOD"), getSessionResponses);
+router.get("/responses/:sessionId", role("CC", "HOD", "FACULTY"), getSessionResponses);
 
 export default router;

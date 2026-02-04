@@ -2,7 +2,9 @@ import express from "express";
 import {
     assignSubjectFaculty,
     getClassAssignments,
-    deleteAssignment
+    deleteAssignment,
+    getMyAssignments,
+    getDepartmentAssignments
 } from "../controllers/courseFileAssignmentController.js";
 import auth from "../middlewares/auth.js";
 import role from "../middlewares/role.js";
@@ -26,6 +28,8 @@ const assignmentValidation = [
 // Class Coordinator assigns faculty to subjects
 router.post("/assign", role("CC", "HOD"), assignmentValidation, validate, assignSubjectFaculty);
 router.get("/class/:classId", getClassAssignments);
+router.get("/my-list", role("FACULTY", "CC", "HOD"), getMyAssignments);
+router.get("/department/list", role("HOD"), getDepartmentAssignments);
 router.delete("/delete/:id", role("CC", "HOD"), deleteAssignment);
 
 export default router;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, FlatList } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, FlatList, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -8,26 +8,44 @@ import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
 import { wp, hp } from '../../utils/responsive';
-import { getMyProfile } from '../../services/api';
-
-const DEADLINES = [
-  { id: '1', title: 'CO-PO Mapping - Due Tomorrow', date: 'Oct 16, 11:59 PM', type: 'urgent' },
-  { id: '2', title: 'Upload Assignment 1 - Due Oct 20', date: 'Data Structures - Class 3B', type: 'warning' },
-];
-
-const ACTIVITIES = [
-  { id: '1', title: 'Lecture Feedback Generated', description: 'Class 5A - Data Structures', time: '1 hour ago', type: 'success' },
-];
+import { getMyProfile, getMyCourseAssignments } from '../../services/api';
 
 const FacultyDashboard = () => {
     const router = useRouter();
     const { name } = useLocalSearchParams();
     const [subjects, setSubjects] = useState([]);
     const [user, setUser] = useState(null);
+    const [courseAssignments, setCourseAssignments] = useState([]);
+    const [upcomingTasks, setUpcomingTasks] = useState([]); // Dynamic Deadlines
+    const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+
+    // Placeholder for activities until API is ready
+    const ACTIVITIES = [
+        { id: '1', title: 'Lecture Feedback Generated', description: 'Class 5A - Data Structures', time: '1 hour ago', type: 'success' },
+    ];
 
     useEffect(() => {
         fetchProfile();
+        fetchCourseAssignments();
+        fetchMyTasks();
     }, []);
+
+    const fetchMyTasks = async () => {
+        try {
+             // We need an API for this. getCourseTasks returns all tasks.
+             // We will filter pending.
+             const { getCourseTasks } = require('../../services/api');
+             const tasks = await getCourseTasks();
+             const pending = tasks.filter(t => t.status === 'PENDING')
+                                  .sort((a,b) => new Date(a.deadline) - new Date(b.deadline))
+                                  .slice(0, 5); // Start with top 5
+             
+             setUpcomingTasks(pending);
+        } catch (e) {
+            console.log("Error fetching tasks", e);
+        }
+    }
 
     const fetchProfile = async () => {
         try {
@@ -50,6 +68,18 @@ const FacultyDashboard = () => {
         }
     };
 
+    const fetchCourseAssignments = async () => {
+        setLoading(true);
+        try {
+            const data = await getMyCourseAssignments();
+            setCourseAssignments(data || []);
+        } catch (error) {
+            console.log("Failed to fetch course assignments", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const renderSubjectCard = ({ item }) => (
         <TouchableOpacity style={[styles.subjectCard, { backgroundColor: item.color }]} onPress={() => router.push('/course-checklist')}>
             <View style={styles.subjectIconContainer}>
@@ -62,9 +92,23 @@ const FacultyDashboard = () => {
         </TouchableOpacity>
     );
 
+
+
+    const onRefresh = React.useCallback(async () => {
+        setRefreshing(true);
+        try {
+           await Promise.all([fetchProfile(), fetchCourseAssignments(), fetchMyTasks()]);
+        } finally {
+           setRefreshing(false);
+        }
+    }, []);
+
     return (
         <ScreenWrapper backgroundColor={COLORS.surfaceLight} withPadding={false}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView 
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            >
                 
                 {/* Header Section */}
                 <View style={styles.header}>
@@ -81,27 +125,66 @@ const FacultyDashboard = () => {
                     </TouchableOpacity>
                 </View>
 
-                {/* My Subjects Section */}
+
+                <View style={[styles.section, { paddingHorizontal: SPACING.l, marginTop: SPACING.m }]}>
+                    <TouchableOpacity 
+                        style={[styles.taskCard, { backgroundColor: '#10B98120', borderColor: '#10B981', marginHorizontal: 0 }]}
+                        onPress={() => router.push('/feedback/monitoring')}
+                    >
+                        <View style={{flexDirection:'row', alignItems:'center', gap: 12}}>
+                            <View style={{padding:8, backgroundColor: '#10B981', borderRadius:8}}>
+                                <Ionicons name="stats-chart" size={24} color={COLORS.white} />
+                            </View>
+                            <View>
+                                <AppText style={{fontSize:16, fontWeight:'600'}}>Feedback Reports</AppText>
+                                <AppText variant="caption" style={{color: COLORS.textSecondary}}>View results of your feedback sessions</AppText>
+                            </View>
+                            <View style={{flex:1, alignItems:'flex-end'}}>
+                                <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+                            </View>
+                        </View>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Course File Compliance Section */}
                 <View style={styles.section}>
-                    <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center', paddingHorizontal: SPACING.l, marginBottom: SPACING.m}}>
-                        <AppText variant="h3" style={{color: COLORS.textPrimary}}>My Subjects</AppText>
-                        <TouchableOpacity onPress={() => router.push('/create-assessment')} style={{flexDirection:'row', alignItems:'center'}}>
-                            <Ionicons name="add-circle" size={20} color={COLORS.primary} style={{marginRight: 4}}/>
-                            <AppText style={{color: COLORS.primary, fontWeight:'600'}}>Assessment</AppText>
-                        </TouchableOpacity>
-                    </View>
-                    {subjects.length > 0 ? (
-                        <FlatList 
-                            data={subjects}
-                            renderItem={renderSubjectCard}
-                            keyExtractor={item => item.id}
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.subjectsList}
-                        />
+                    <AppText variant="h3" style={styles.sectionTitle}>Course File Status</AppText>
+                    {courseAssignments.length > 0 ? (
+                        courseAssignments.map(assign => {
+                            const total = assign?.progress?.total || 0;
+                            const completed = assign?.progress?.completed || 0;
+                            const percent = total > 0 ? (completed / total) * 100 : 0;
+                            const isComplianceRisk = percent < 50; // Simple logic
+
+                            return (
+                                <TouchableOpacity 
+                                    key={assign.id} 
+                                    style={styles.taskCard}
+                                    onPress={() => router.push(`/course-checklist?assignmentId=${assign.id}`)}
+                                >
+                                    <View style={{flexDirection:'row', justifyContent:'space-between', marginBottom: 8}}>
+                                        <AppText style={{fontWeight:'600'}}>{assign.subject.name}</AppText>
+                                        <AppText style={{color: COLORS.textSecondary}}>{assign.class.name}</AppText>
+                                    </View>
+                                    
+                                    <View style={{height: 6, backgroundColor: COLORS.surface, borderRadius: 3, marginVertical: 8, overflow:'hidden'}}>
+                                        <View style={{height:'100%', width: `${percent}%`, backgroundColor: isComplianceRisk ? COLORS.warning : COLORS.success}} />
+                                    </View>
+
+                                    <View style={{flexDirection:'row', justifyContent:'space-between'}}>
+                                        <AppText variant="caption" style={{color: isComplianceRisk ? COLORS.warning : COLORS.success}}>
+                                            {completed}/{total} Tasks Completed
+                                        </AppText>
+                                        <AppText variant="caption" style={{color: COLORS.textLight}}>
+                                            {Math.round(percent)}%
+                                        </AppText>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })
                     ) : (
                         <View style={{paddingHorizontal: SPACING.l}}>
-                            <AppText style={{color: COLORS.textSecondary, fontStyle: 'italic'}}>No subjects assigned yet.</AppText>
+                            <AppText style={{color: COLORS.textSecondary, fontStyle: 'italic'}}>No course files assigned.</AppText>
                         </View>
                     )}
                 </View>
@@ -136,30 +219,39 @@ const FacultyDashboard = () => {
                 {/* Pending Deadlines Section */}
                 <View style={styles.section}>
                     <AppText variant="h3" style={styles.sectionTitle}>Pending Deadlines</AppText>
-                    {DEADLINES.map(task => (
-                        <View key={task.id} style={styles.taskCard}>
-                            <View style={styles.taskHeader}>
-                                <View style={[
-                                    styles.statusDot, 
-                                    { backgroundColor: task.type === 'urgent' ? COLORS.error : COLORS.warning }
-                                ]} />
-                                <AppText style={[
-                                    styles.taskTitle,
-                                    { color: task.type === 'urgent' ? COLORS.error : COLORS.warning }
-                                ]}>
-                                    {task.title}
-                                </AppText>
-                            </View>
-                            <View style={styles.taskFooter}>
-                                <AppText variant="caption" style={styles.taskDate}>{task.date}</AppText>
-                                <TouchableOpacity style={styles.actionButton}>
-                                    <AppText variant="caption" style={styles.actionButtonText}>
-                                        {task.type === 'urgent' ? 'Action Required' : 'View Details'}
+                    {upcomingTasks.length > 0 ? upcomingTasks.map(task => {
+                        const isUrgent = new Date(task.deadline) < new Date(Date.now() + 3*24*60*60*1000); // 3 days
+                        return (
+                            <View key={task.id} style={styles.taskCard}>
+                                <View style={styles.taskHeader}>
+                                    <View style={[
+                                        styles.statusDot, 
+                                        { backgroundColor: isUrgent ? COLORS.error : COLORS.warning }
+                                    ]} />
+                                    <AppText style={[
+                                        styles.taskTitle,
+                                        { color: isUrgent ? COLORS.error : COLORS.warning }
+                                    ]}>
+                                        {task.template && task.template.title ? task.template.title : "Task"}
                                     </AppText>
-                                </TouchableOpacity>
+                                </View>
+                                <View style={styles.taskFooter}>
+                                    <AppText variant="caption" style={styles.taskDate}>
+                                        Due: {new Date(task.deadline).toLocaleDateString('en-US', {month:'short', day:'numeric'})}
+                                    </AppText>
+                                    <TouchableOpacity style={styles.actionButton}>
+                                        <AppText variant="caption" style={styles.actionButtonText}>
+                                            {isUrgent ? 'Action Required' : 'View Details'}
+                                        </AppText>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
+                        );
+                    }) : (
+                        <View style={{paddingHorizontal: SPACING.l}}>
+                            <AppText style={{color: COLORS.textSecondary, fontStyle:'italic'}}>No pending deadlines.</AppText>
                         </View>
-                    ))}
+                    )}
                 </View>
 
                 {/* Recent Activity Section */}
@@ -187,12 +279,14 @@ const FacultyDashboard = () => {
             </ScrollView>
 
             {/* Floating Action Button for creating feedback session */}
-            <TouchableOpacity 
-                style={styles.fab} 
-                onPress={() => router.push('/create-feedback')}
-            >
-                <Ionicons name="add" size={30} color={COLORS.white} />
-            </TouchableOpacity>
+            {subjects.length > 0 && ( /* Updated to use local subjects derived from profile */
+                <TouchableOpacity 
+                    style={styles.fab} 
+                    onPress={() => router.push('/feedback/session/start')}
+                >
+                    <Ionicons name="add" size={30} color={COLORS.white} />
+                </TouchableOpacity>
+            )}
 
         </ScreenWrapper>
     );

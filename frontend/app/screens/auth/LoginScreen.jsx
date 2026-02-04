@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Modal, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Modal, FlatList, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -26,7 +26,7 @@ const LoginScreen = () => {
   // Handlers
   const handleLogin = async () => {
     if (!username || !password) {
-        alert("Please enter Username and Password");
+        Alert.alert("Input Required", "Please enter both Username and Password.");
         return;
     }
 
@@ -74,8 +74,15 @@ const LoginScreen = () => {
         }
 
     } catch (error) {
-        console.error(error);
-        alert(error.message || "Login Failed");
+        const errorMessage = error.message || "Login Failed";
+        
+        if (error.message === "Invalid Credentials!!!") {
+            Alert.alert("Authentication Failed", "Please check your Username and Password.");
+        } else {
+            // Log to console only for unexpected errors, use warn to avoid red box overlay in expo
+            console.warn("Login Error:", error);
+            Alert.alert("Error", errorMessage);
+        }
     } finally {
         setLoading(false);
     }
@@ -163,9 +170,9 @@ const LoginScreen = () => {
                     </AppText>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.forgotPassword} onPress={() => router.push('/change-password')}>
+                {/* <TouchableOpacity style={styles.forgotPassword} onPress={() => router.push('/change-password')}>
                     <AppText variant="caption" color={COLORS.primary}>Forgot Password?</AppText>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
             </View>
 
           </View>

@@ -135,3 +135,42 @@ export const getSessionResponses = async (req, res) => {
         res.status(500).json({ message: "Failed to fetch responses" });
     }
 };
+
+export const getAllSessions = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const userRole = req.user.role;
+
+        let whereClause = {};
+
+        if (userRole === "CC") {
+             const user = await prisma.user.findUnique({
+                where: { id: userId },
+                include: { classesCoordinated: true }
+            });
+            const classIds = user.classesCoordinated.map(c => c.id);
+            whereClause = { classId: { in: classIds } };
+        }
+        // Faculty sees their own?
+        if (userRole === "FACULTY") {
+             whereClause = { facultyId: userId };
+        }
+
+        const sessions = await prisma.feedbackSession.findMany({
+            where: whereClause,
+            include: {
+                template: { select: { title: true } },
+                class: { select: { name: true } },
+                subject: { select: { name: true } },
+                faculty: { select: { name: true } },
+                _count: { select: { responses: true } }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        res.status(200).json(sessions);
+    } catch (error) {
+        console.error("Error fetching all sessions:", error);
+        res.status(500).json({ message: "Failed to fetch sessions" });
+    }
+};

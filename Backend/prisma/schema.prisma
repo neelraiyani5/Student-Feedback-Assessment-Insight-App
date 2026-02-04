@@ -54,7 +54,7 @@ model User {
   courseFileAssignments CourseFileAssignment[]
   mustChangePassword Boolean @default(true)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime? @updatedAt
 }
 
 model FeedbackTemplate {
@@ -127,7 +127,7 @@ model CourseFileAssignment {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@unique([classId, subjectId]) // Only one faculty per subject in a class
+  @@unique([classId, subjectId, facultyId], name: "course_assignment_unique")
 }
 
 model CourseFileTaskSubmission {
@@ -138,7 +138,7 @@ model CourseFileTaskSubmission {
   template      CourseFileTaskTemplate @relation(fields: [templateId], references: [id])
   
   status        String   @default("PENDING") // PENDING, COMPLETED
-  deadline      DateTime
+  deadline      DateTime?
   
   ccStatus      String   @default("PENDING") // PENDING, YES, NO
   ccRemarks     String?

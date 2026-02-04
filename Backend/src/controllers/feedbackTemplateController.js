@@ -81,10 +81,10 @@ export const deleteTemplate = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Soft delete by setting isActive to false (or hard delete as requested)
-        // The user said "edit and delete", usually hard delete is fine if not specified.
-        await prisma.feedbackTemplate.delete({
-            where: { id }
+        // Soft delete by setting isActive to false
+        await prisma.feedbackTemplate.update({
+            where: { id },
+            data: { isActive: false }
         });
 
         res.status(200).json({ message: "Template deleted successfully" });

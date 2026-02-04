@@ -76,16 +76,23 @@ export const getClassAssignments = async (req, res) => {
             include: {
                 subject: { select: { id: true, name: true } },
                 faculty: { select: { id: true, name: true, userId: true } },
+                class: { select: { id: true, name: true } },
                 _count: {
                     select: {
-                        tasks: {
-                            where: { status: 'COMPLETED' }
-                        }
+                        tasks: true
                     }
                 }
             }
         });
-        res.status(200).json(assignments);
+
+        const assignmentsWithProgress = await Promise.all(assignments.map(async (a) => {
+             const completed = await prisma.courseFileTaskSubmission.count({
+                 where: { assignmentId: a.id, status: 'COMPLETED' }
+             });
+             return { ...a, progress: { completed, total: a._count.tasks } };
+        }));
+
+        res.status(200).json(assignmentsWithProgress);
     } catch (error) {
         res.status(500).json({ message: "Failed to fetch assignments" });
     }
@@ -114,5 +121,79 @@ export const deleteAssignment = async (req, res) => {
         res.status(200).json({ message: "Assignment deleted successfully" });
     } catch (error) {
         res.status(500).json({ message: "Failed to delete assignment" });
+    }
+};
+
+export const getMyAssignments = async (req, res) => {
+    try {
+        const facultyId = req.user.id;
+        const assignments = await prisma.courseFileAssignment.findMany({
+            where: { facultyId },
+            include: {
+                subject: { select: { id: true, name: true } },
+                class: { select: { id: true, name: true, semester: true } },
+                _count: {
+                    select: {
+                        tasks: true
+                    }
+                }
+            }
+        });
+        
+        // Calculate progress manually or use aggregation
+        // We need pending vs completed count
+        
+        const assignmentsWithProgress = await Promise.all(assignments.map(async (a) => {
+             const completed = await prisma.courseFileTaskSubmission.count({
+                 where: { assignmentId: a.id, status: 'COMPLETED' }
+             });
+             return { ...a, progress: { completed, total: a._count.tasks } };
+        }));
+
+        res.status(200).json(assignmentsWithProgress);
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch my assignments" });
+    }
+};
+
+export const getDepartmentAssignments = async (req, res) => {
+    try {
+        const hodId = req.user.id;
+        
+        // Find departments where user is HOD
+        const departments = await prisma.department.findMany({
+            where: { hodId },
+            select: { id: true }
+        });
+        
+        const deptIds = departments.map(d => d.id);
+
+        const assignments = await prisma.courseFileAssignment.findMany({
+            where: {
+                class: {
+                    semester: {
+                        departmentId: { in: deptIds }
+                    }
+                }
+            },
+            include: {
+                subject: { select: { id: true, name: true } },
+                faculty: { select: { id: true, name: true } },
+                class: { select: { id: true, name: true } },
+                _count: { select: { tasks: true } }
+            }
+        });
+
+        // Add progress
+         const assignmentsWithProgress = await Promise.all(assignments.map(async (a) => {
+             const completed = await prisma.courseFileTaskSubmission.count({
+                 where: { assignmentId: a.id, status: 'COMPLETED' }
+             });
+             return { ...a, progress: { completed, total: a._count.tasks } };
+        }));
+
+        res.status(200).json(assignmentsWithProgress);
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch department assignments" });
     }
 };

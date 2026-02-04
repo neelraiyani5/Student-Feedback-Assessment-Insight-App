@@ -8,23 +8,28 @@ import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
 import { wp, hp } from '../../utils/responsive';
-import { getStudentSubjects } from '../../services/api';
+import { getStudentSubjects, getStudentSessions } from '../../services/api';
 
 const StudentDashboard = () => {
     const router = useRouter();
     const { name } = useLocalSearchParams();
     const [subjects, setSubjects] = useState([]);
+    const [pendingFeedbackCount, setPendingFeedbackCount] = useState(0);
 
     useEffect(() => {
-        fetchSubjects();
+        fetchData();
     }, []);
 
-    const fetchSubjects = async () => {
+    const fetchData = async () => {
         try {
-            const data = await getStudentSubjects();
-            setSubjects(data.subjects || []);
+            const [subjectsData, sessionsData] = await Promise.all([
+                getStudentSubjects(),
+                getStudentSessions()
+            ]);
+            setSubjects(subjectsData.subjects || []);
+            setPendingFeedbackCount(sessionsData ? sessionsData.length : 0);
         } catch (error) {
-            console.log("Error fetching subjects", error);
+            console.log("Error fetching dashboard data", error);
         }
     };
 
@@ -48,15 +53,17 @@ const StudentDashboard = () => {
                 </View>
 
                 {/* Hero Notification Card */}
-                <View style={styles.heroCard}>
-                    <View style={styles.heroContent}>
-                        <Ionicons name="alert-circle" size={32} color={COLORS.accent} style={styles.heroIcon} />
-                        <View style={styles.heroTextContainer}>
-                            <AppText variant="h3" style={styles.heroTitle}>Action Required</AppText>
-                            <AppText style={styles.heroSubtitle}>Check your performance</AppText>
+                {pendingFeedbackCount > 0 && (
+                    <View style={styles.heroCard}>
+                        <View style={styles.heroContent}>
+                            <Ionicons name="alert-circle" size={32} color={COLORS.accent} style={styles.heroIcon} />
+                            <View style={styles.heroTextContainer}>
+                                <AppText variant="h3" style={styles.heroTitle}>Feedback Required</AppText>
+                                <AppText style={styles.heroSubtitle}>You have {pendingFeedbackCount} pending feedback sessions.</AppText>
+                            </View>
                         </View>
                     </View>
-                </View>
+                )}
 
                 {/* Stats Section */}
                 <View style={styles.statsContainer}>
@@ -79,6 +86,39 @@ const StudentDashboard = () => {
                         <AppText variant="h2" style={{ color: '#1E3A8A', marginTop: SPACING.xs }}>-</AppText>
                     </TouchableOpacity >
                 </View>
+
+                {/* Feedback Action */}
+                <TouchableOpacity 
+                    style={{
+                        backgroundColor: COLORS.primary,
+                        marginHorizontal: SPACING.l,
+                        borderRadius: LAYOUT.radius.l,
+                        padding: SPACING.l,
+                        marginBottom: SPACING.xl,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        elevation: 4,
+                        shadowColor: COLORS.primary,
+                        shadowOffset: {width:0, height:4},
+                        shadowOpacity:0.3,
+                        shadowRadius:8
+                    }}
+                    onPress={() => router.push('/student/feedback/list')}
+                >
+                    <View style={{flexDirection:'row', alignItems:'center'}}>
+                        <View style={{padding:8, backgroundColor:'rgba(255,255,255,0.2)', borderRadius:8, marginRight:12}}>
+                             <Ionicons name="chatbubbles" size={24} color={COLORS.white} />
+                        </View>
+                        <View>
+                            <AppText variant="h3" style={{color: COLORS.white}}>Give Feedback</AppText>
+                            <AppText style={{color: 'rgba(255,255,255,0.8)'}}>
+                                {pendingFeedbackCount > 0 ? `${pendingFeedbackCount} Sessions Pending` : 'No pending feedback'}
+                            </AppText>
+                        </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={24} color={COLORS.white} />
+                </TouchableOpacity>
 
                 {/* My Subjects List */}
                 <View style={styles.section}>

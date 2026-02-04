@@ -1,37 +1,94 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Switch, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Switch, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
-import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
-import { wp, hp } from '../../utils/responsive';
-
-// Mock Data
-const TASKS_DATA = [
-  { id: '1', title: '1. Vision & Mission Alignment', completed: true, dueDate: null },
-  { id: '2', title: '2. CO-PO-PSO Mapping', completed: false, dueDate: 'Oct 20' },
-  { id: '3', title: '3. Lesson Plan', completed: true, dueDate: null },
-  { id: '4', title: '4. Question Bank', completed: false, dueDate: 'Oct 25' },
-  { id: '5', title: '5. Assignment 1', completed: false, dueDate: 'Nov 01' },
-];
+import { COLORS, SPACING, LAYOUT } from '../../constants/theme';
+import { hp } from '../../utils/responsive';
+import { getCourseTasks, completeCourseTask } from '../../services/api';
 
 const ChecklistScreen = () => {
     const router = useRouter();
-    const [tasks, setTasks] = useState(TASKS_DATA);
+    const { assignmentId } = useLocalSearchParams();
+    const [tasks, setTasks] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [assignmentInfo, setAssignmentInfo] = useState({ subject: '', class: '' });
 
-    // Calculate progress
-    const completedCount = tasks.filter(t => t.completed).length;
-    const progressPercent = Math.round((completedCount / tasks.length) * 100);
+    useEffect(() => {
+        fetchTasks();
+    }, [assignmentId]);
 
-    const toggleTask = (id) => {
-        setTasks(currentTasks => 
-            currentTasks.map(task => 
-                task.id === id ? { ...task, completed: !task.completed } : task
-            )
+    const fetchTasks = async () => {
+        setLoading(true);
+        try {
+            const allTasks = await getCourseTasks();
+            // Filter by Assignment
+            const filtered = allTasks.filter(t => t.assignmentId === assignmentId);
+            setTasks(filtered);
+            
+            if (filtered.length > 0) {
+                setAssignmentInfo({
+                    subject: filtered[0].assignment.subject.name,
+                    class: filtered[0].assignment.class.name
+                });
+            }
+        } catch (error) {
+            console.log("Failed to fetch tasks", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleTaskCompletion = async (taskId, currentStatus, ccStatus, hodStatus) => {
+        // Allow toggle if Pending OR if Rejected (Returned)
+        // If Completed and NOT Rejected, prevent accidental toggle
+        const isRejected = ccStatus === 'NO' || hodStatus === 'NO';
+        
+        if (currentStatus === 'COMPLETED' && !isRejected) {
+             Alert.alert("Completed", "This task is already completed.");
+             return; 
+        }
+
+        const newStatus = currentStatus === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
+
+        // If Unchecking (Reverting to Pending), strictly verify user intent
+        if (currentStatus === 'COMPLETED') {
+             // Logic to reverting... backend might not support revert yet? 
+             // api.js `completeCourseTask` usually just sets to COMPLETE.
+             // We can implement a revert if needed, but for now let's assume valid forward progress 
+             // IF it is rejected, we assume they are RE-submitting (so sticking to COMPLETE update).
+             // If valid re-submission, they just hit Complete again?
+             // Actually, if it's already COMPLETED in DB, calling complete again updates timestamp.
+             // So if Rejected, we let them click.
+        }
+
+        Alert.alert(
+            "Confirm Completion",
+            "Mark this task as completed?",
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Confirm", 
+                    onPress: async () => {
+                        try {
+                            // Optimistic update
+                            setTasks(current => current.map(t => t.id === taskId ? { ...t, status: 'COMPLETED' } : t));
+                            await completeCourseTask(taskId);
+                        } catch (error) {
+                            Alert.alert("Error", "Failed to update task status");
+                            fetchTasks(); // Revert
+                        }
+                    } 
+                }
+            ]
         );
     };
+
+    // Calculate progress
+    const completedCount = tasks.filter(t => t.status === 'COMPLETED').length;
+    const progressPercent = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
 
     return (
         <ScreenWrapper backgroundColor={COLORS.surfaceLight} withPadding={false}>
@@ -43,7 +100,8 @@ const ChecklistScreen = () => {
                 </TouchableOpacity>
                 
                 <View style={styles.headerContent}>
-                    <AppText variant="h2" style={styles.title}>Data Structures (CSE-501)</AppText>
+                    <AppText variant="h2" style={styles.title}>{assignmentInfo.subject || 'Course File'}</AppText>
+                    <AppText variant="body2" style={{marginBottom: SPACING.m, color: COLORS.textSecondary}}>{assignmentInfo.class}</AppText>
                     
                     <View style={styles.progressContainer}>
                         <View style={styles.progressInfo}>
@@ -58,58 +116,125 @@ const ChecklistScreen = () => {
             </View>
 
             {/* Tasks List */}
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {tasks.map((task) => (
-                    <View key={task.id} style={styles.taskCard}>
-                        {/* Task Title Row */}
-                        <View style={styles.taskRow}>
-                            <AppText style={[
-                                styles.taskTitle, 
-                                task.completed && styles.taskTitleCompleted
-                            ]}>
-                                {task.title}
-                            </AppText>
-                            <Switch
-                                trackColor={{ false: COLORS.inputBorder, true: COLORS.success }}
-                                thumbColor={COLORS.white}
-                                ios_backgroundColor={COLORS.inputBorder}
-                                onValueChange={() => toggleTask(task.id)}
-                                value={task.completed}
-                                style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                            />
-                        </View>
+            {loading ? (
+                <View style={{flex:1, justifyContent:'center', alignItems:'center'}}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
+            ) : (
+                <ScrollView contentContainerStyle={styles.scrollContent}>
+                    {tasks.map((task) => {
+                        const isRejected = task.ccStatus === 'NO' || task.hodStatus === 'NO';
+                        const isCompleted = task.status === 'COMPLETED';
 
-                        {/* Task Details Row (Status/Action) */}
-                        <View style={styles.taskFooter}>
-                            {task.completed ? (
-                                <View style={styles.statusBadgeCompleted}>
-                                    <Ionicons name="checkmark-circle" size={14} color={COLORS.success} />
-                                    <AppText variant="small" style={styles.statusTextCompleted}>Completed</AppText>
+                        return (
+                            <View key={task.id} style={styles.taskCard}>
+                                {/* Task Title Row */}
+                                <View style={styles.taskRow}>
+                                    <View style={{flex: 1, marginRight: SPACING.s}}>
+                                        <AppText style={[
+                                            styles.taskTitle, 
+                                            isCompleted && !isRejected && styles.taskTitleCompleted
+                                        ]}>
+                                            {task.template.title}
+                                        </AppText>
+                                        {task.template.description && (
+                                            <AppText variant="caption" style={{color: COLORS.textLight, marginTop: 2}}>
+                                                {task.template.description}
+                                            </AppText>
+                                        )}
+                                    </View>
+                                    
+                                    <Switch
+                                        trackColor={{ false: COLORS.inputBorder, true: isRejected ? COLORS.warning : COLORS.success }}
+                                        thumbColor={COLORS.white}
+                                        ios_backgroundColor={COLORS.inputBorder}
+                                        onValueChange={() => handleTaskCompletion(task.id, task.status, task.ccStatus, task.hodStatus)}
+                                        value={isCompleted}
+                                        disabled={isCompleted && !isRejected} 
+                                        style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                                    />
                                 </View>
-                            ) : (
-                                <View style={styles.actionsContainer}>
-                                    {task.dueDate && (
-                                        <View style={styles.dueDateBadge}>
-                                            <AppText variant="small" style={styles.dueDateText}>Due: {task.dueDate}</AppText>
+
+                                {/* Task Details Row (Status/Action) */}
+                                <View style={styles.taskFooter}>
+                                    {isCompleted ? (
+                                        <View style={[styles.statusBadgeCompleted, isRejected && {backgroundColor: '#FFFBEB'}]}>
+                                            <Ionicons 
+                                                name={isRejected ? "alert-circle" : "checkmark-circle"} 
+                                                size={14} 
+                                                color={isRejected ? COLORS.warning : COLORS.success} 
+                                            />
+                                            <AppText variant="small" style={[styles.statusTextCompleted, isRejected && {color: COLORS.warning}]}>
+                                                {isRejected ? 'Action Required' : 'Completed'}
+                                            </AppText>
+                                        </View>
+                                    ) : (
+                                        <View style={styles.actionsContainer}>
+                                            {task.deadline ? (
+                                                <View style={styles.dueDateBadge}>
+                                                    <AppText variant="small" style={styles.dueDateText}>
+                                                        Due: {new Date(task.deadline).toLocaleDateString('en-US', {month:'short', day:'numeric'})}
+                                                    </AppText>
+                                                </View>
+                                            ) : (
+                                                <View style={[styles.dueDateBadge, {borderColor: COLORS.border, backgroundColor: COLORS.surface}]}>
+                                                    <AppText variant="small" style={{color: COLORS.textSecondary}}>No Deadline</AppText>
+                                                </View>
+                                            )}
                                         </View>
                                     )}
-                                    <TouchableOpacity style={styles.uploadButton}>
-                                        <Ionicons name="cloud-upload-outline" size={18} color={COLORS.primary} />
-                                        <AppText variant="small" style={styles.uploadText}>Upload</AppText>
-                                    </TouchableOpacity>
                                 </View>
-                            )}
+                                
+                                {/* Review Status Info */}
+                                {(task.ccStatus !== 'PENDING' || task.hodStatus !== 'PENDING') && (
+                                    <View style={{marginTop: 8, padding: 8, backgroundColor: COLORS.surface, borderRadius: 4, flexDirection: 'row', flexWrap:'wrap', gap: 12}}>
+                                        {task.ccStatus !== 'PENDING' && (
+                                            <View style={{flexDirection:'row', alignItems:'center'}}>
+                                                <AppText variant="caption" style={{marginRight: 4, fontWeight:'600', color: COLORS.textSecondary}}>CC:</AppText>
+                                                {task.ccStatus === 'YES' ? (
+                                                    <Ionicons name="checkmark-circle" size={16} color={COLORS.success} /> 
+                                                ) : (
+                                                    <View style={{flexDirection:'row', alignItems:'center'}}>
+                                                        <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+                                                        <AppText variant="caption" style={{color: COLORS.error, marginLeft: 2}}>Returned</AppText>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+                                        
+                                        {task.hodStatus !== 'PENDING' && (
+                                            <View style={{flexDirection:'row', alignItems:'center'}}>
+                                                <AppText variant="caption" style={{marginRight: 4, fontWeight:'600', color: COLORS.textSecondary}}>HOD:</AppText>
+                                                {task.hodStatus === 'YES' ? (
+                                                    <Ionicons name="checkmark-circle" size={16} color={COLORS.success} /> 
+                                                ) : (
+                                                    <View style={{flexDirection:'row', alignItems:'center'}}>
+                                                        <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+                                                        <AppText variant="caption" style={{color: COLORS.error, marginLeft: 2}}>Returned</AppText>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+                                        
+                                        {(task.ccRemarks || task.hodRemarks) && (
+                                            <View style={{width: '100%', marginTop: 4, padding: 4, backgroundColor: '#FEF2F2', borderRadius: 4}}>
+                                                <AppText variant="caption" style={{color: COLORS.error, fontStyle: 'italic'}}>
+                                                    Remarks: "{task.ccRemarks || task.hodRemarks}"
+                                                </AppText>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
+                            </View>
+                        );
+                    })}
+                    {tasks.length === 0 && (
+                        <View style={{padding: SPACING.l, alignItems:'center'}}>
+                             <AppText style={{color: COLORS.textSecondary}}>No tasks found for this assignment.</AppText>
                         </View>
-                    </View>
-                ))}
-            </ScrollView>
-
-            {/* Sticky Footer */}
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.saveButton}>
-                    <AppText style={styles.saveButtonText}>Save Progress</AppText>
-                </TouchableOpacity>
-            </View>
+                    )}
+                </ScrollView>
+            )}
 
         </ScreenWrapper>
     );
@@ -180,11 +305,11 @@ const styles = StyleSheet.create({
     taskTitle: {
         fontSize: 16,
         color: COLORS.textPrimary,
-        flex: 1,
-        marginRight: SPACING.s,
+        fontWeight: '500'
     },
     taskTitleCompleted: {
         color: COLORS.textSecondary,
+        textDecorationLine: 'line-through'
     },
     taskFooter: {
         flexDirection: 'row',
@@ -219,43 +344,6 @@ const styles = StyleSheet.create({
     },
     dueDateText: {
         color: COLORS.error,
-        fontWeight: '600',
-    },
-    uploadButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: SPACING.s,
-        paddingVertical: 4,
-    },
-    uploadText: {
-        color: COLORS.primary,
-        marginLeft: 4,
-        fontWeight: '500',
-    },
-    footer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: COLORS.white,
-        padding: SPACING.m,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-        elevation: 10,
-        shadowColor: COLORS.black,
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-    },
-    saveButton: {
-        backgroundColor: COLORS.primary,
-        borderRadius: LAYOUT.radius.round,
-        paddingVertical: SPACING.m,
-        alignItems: 'center',
-    },
-    saveButtonText: {
-        color: COLORS.white,
-        fontSize: 16,
         fontWeight: '600',
     }
 });
