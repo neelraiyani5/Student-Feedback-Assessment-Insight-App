@@ -318,25 +318,36 @@ export const updateClass = async (req, res) => {
 
 export const createSubject = async (req, res) => {
   try {
-    const { name } = req.body;
-    const ccId = req.user.id;
+    const { name, semesterId: providedSemesterId } = req.body;
+    const userId = req.user.id;
+    const userRole = req.user.role;
 
-    // Verify CC and get their Class
-    const ccClass = await prisma.class.findFirst({
-      where: { ccId },
-    });
+    let semesterId = providedSemesterId;
 
-    if (!ccClass) {
-      return res
-        .status(404)
-        .json({ message: "You are not assigned as Class Coordinator." });
+    // If CC, auto-detect semester from their class
+    if (userRole === "CC") {
+      const ccClass = await prisma.class.findFirst({
+        where: { ccId: userId },
+      });
+
+      if (!ccClass) {
+        return res
+          .status(404)
+          .json({ message: "You are not assigned as Class Coordinator." });
+      }
+      semesterId = ccClass.semesterId;
+    }
+
+    // HOD must provide semesterId
+    if (!semesterId) {
+      return res.status(400).json({ message: "Semester ID is required." });
     }
 
     // Check if subject exists in this semester
     const exists = await prisma.subject.findFirst({
       where: {
         name,
-        semesterId: ccClass.semesterId,
+        semesterId,
       },
     });
 
@@ -349,7 +360,7 @@ export const createSubject = async (req, res) => {
     const subject = await prisma.subject.create({
       data: {
         name,
-        semesterId: ccClass.semesterId,
+        semesterId,
       },
     });
 
@@ -464,8 +475,21 @@ export const assignFacultyToSubject = async (req, res) => {
           data: { subjectIds: { push: subjectId } },
         });
 
-        // Auto-Create Course File Assignment + Tasks if Class context exists
-        if (ccClass) {
+        // Auto-Create Course File Assignment + Tasks for ALL Classes in that Semester
+        // 1. Get Semester ID from Subject
+        // 2. Get All Classes in that Semester
+        // 3. Loop and Create Assignment
+        
+        if (!subject.semesterId) {
+             console.warn("Subject has no semester ID, skipping course file creation.");
+             return;
+        }
+
+        const classesInSemester = await prisma.class.findMany({
+            where: { semesterId: subject.semesterId }
+        });
+
+        for (const cls of classesInSemester) {
           // Check if assignment already exists (idempotency)
           const existingAssignment =
             await prisma.courseFileAssignment.findUnique({
@@ -473,7 +497,7 @@ export const assignFacultyToSubject = async (req, res) => {
                 course_assignment_unique: {
                   subjectId,
                   facultyId: uid,
-                  classId: ccClass.id,
+                  classId: cls.id,
                 },
               },
             });
@@ -483,7 +507,7 @@ export const assignFacultyToSubject = async (req, res) => {
               data: {
                 subjectId,
                 facultyId: uid,
-                classId: ccClass.id,
+                classId: cls.id,
               },
             });
 
@@ -491,7 +515,6 @@ export const assignFacultyToSubject = async (req, res) => {
             const submissions = templates.map((template) => ({
               assignmentId: assignment.id,
               templateId: template.id,
-              // deadline: null, // Optional now
               status: "PENDING",
             }));
 
@@ -758,12 +781,40 @@ export const getStudentSubjectPerformance = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // 1. Cleanup relations that would block deletion
+    // a. Unset CC status from classes
+    await prisma.class.updateMany({
+      where: { ccId: id },
+      data: { ccId: null },
+    });
+
+    // b. Remove from subjects (many-to-many list)
+    const subjectsWithFaculty = await prisma.subject.findMany({
+      where: { facultyIds: { has: id } }
+    });
+    
+    for (const subject of subjectsWithFaculty) {
+      await prisma.subject.update({
+        where: { id: subject.id },
+        data: {
+          facultyIds: {
+            set: subject.facultyIds.filter(fid => fid !== id)
+          }
+        }
+      });
+    }
+
+    // 2. Perform the deletion
     await prisma.user.delete({ where: { id } });
+    
     res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to delete user", error: error.message });
+    console.error("Delete user error:", error);
+    res.status(500).json({
+      message: "Failed to delete user. Ensure they are not currently assigned as an HOD or have active Course File Assignments.",
+      error: error.message,
+    });
   }
 };
 

@@ -69,10 +69,10 @@ const StudentDashboard = () => {
                 <View style={styles.statsContainer}>
                     <View style={[styles.statCard, { backgroundColor: '#E0F2FE' }]}> 
                         <View style={styles.statIconBg}>
-                            <Ionicons name="calendar" size={20} color="#0284C7" />
+                            <Ionicons name="book" size={20} color="#0284C7" />
                         </View>
-                        <AppText variant="caption" style={{ color: '#0284C7' }}>Attendance</AppText>
-                        <AppText variant="h2" style={{ color: '#0C4A6E', marginTop: SPACING.xs }}>85%</AppText>
+                        <AppText variant="caption" style={{ color: '#0284C7' }}>My Subjects</AppText>
+                        <AppText variant="h2" style={{ color: '#0C4A6E', marginTop: SPACING.xs }}>{subjects.length}</AppText>
                     </View>
 
                     <TouchableOpacity  

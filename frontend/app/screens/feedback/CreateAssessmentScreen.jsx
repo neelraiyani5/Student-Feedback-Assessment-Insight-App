@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity, TextInput, Modal, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
@@ -12,6 +12,7 @@ const COMPONENT_TYPES = ['CSE', 'IA', 'ESE'];
 
 const CreateAssessmentScreen = () => {
     const router = useRouter();
+    const params = useLocalSearchParams();
     const [loading, setLoading] = useState(false);
     
     // Data
@@ -19,8 +20,8 @@ const CreateAssessmentScreen = () => {
     const [availableClasses, setAvailableClasses] = useState([]);
 
     // Form State
-    const [selectedSubject, setSelectedSubject] = useState(null);
-    const [selectedClass, setSelectedClass] = useState(null);
+    const [selectedSubject, setSelectedSubject] = useState(params.subjectId ? { id: params.subjectId, name: params.subjectName } : null);
+    const [selectedClass, setSelectedClass] = useState(params.classId ? { id: params.classId, name: params.className } : null);
     const [title, setTitle] = useState('');
     const [component, setComponent] = useState('IA');
     const [maxMarks, setMaxMarks] = useState('');
@@ -35,9 +36,9 @@ const CreateAssessmentScreen = () => {
     }, []);
 
     useEffect(() => {
-        if (selectedSubject) {
+        if (selectedSubject && !params.subjectId) {
             fetchClasses(selectedSubject.id);
-            setSelectedClass(null); // Reset class selection
+            setSelectedClass(null); // Reset class selection if subject changed manually
         }
     }, [selectedSubject]);
 
@@ -109,12 +110,25 @@ const CreateAssessmentScreen = () => {
 
             <ScrollView contentContainerStyle={styles.content}>
                 
-                {renderDropdown("Subject", selectedSubject?.name, "Select Subject", () => setSubjectModalVisible(true))}
+                {!params.subjectId && renderDropdown("Subject", selectedSubject?.name, "Select Subject", () => setSubjectModalVisible(true))}
                 
-                {renderDropdown("Class", selectedClass?.name, "Select Class", () => {
+                {!params.classId && renderDropdown("Class", selectedClass?.name, "Select Class", () => {
                     if(!selectedSubject) Alert.alert("Wait", "Select a Subject first");
                     else setClassModalVisible(true);
                 })}
+
+                {(params.subjectName || params.className) && (
+                    <View style={styles.infoBox}>
+                         <View style={styles.infoRow}>
+                            <Ionicons name="book" size={16} color={COLORS.primary} />
+                            <AppText style={styles.infoText}>{params.subjectName}</AppText>
+                         </View>
+                         <View style={styles.infoRow}>
+                            <Ionicons name="people" size={16} color={COLORS.primary} />
+                            <AppText style={styles.infoText}>{params.className}</AppText>
+                         </View>
+                    </View>
+                )}
 
                 <View style={styles.inputGroup}>
                     <AppText variant="caption" style={styles.label}>Assessment Title</AppText>
@@ -286,6 +300,25 @@ const styles = StyleSheet.create({
     closeBtn: {
         marginTop: 16,
         alignSelf: 'center'
+    },
+    infoBox: {
+        backgroundColor: COLORS.primary + '10',
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: SPACING.l,
+        borderWidth: 1,
+        borderColor: COLORS.primary + '20'
+    },
+    infoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4
+    },
+    infoText: {
+        marginLeft: 8,
+        fontSize: 15,
+        fontWeight: '600',
+        color: COLORS.textPrimary
     }
 });
 

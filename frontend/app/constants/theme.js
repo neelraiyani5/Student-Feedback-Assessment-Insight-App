@@ -82,3 +82,5 @@ export const LAYOUT = {
     round: 999,
   },
 };
+
+export default {};

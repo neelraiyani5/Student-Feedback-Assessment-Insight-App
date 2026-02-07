@@ -1,32 +1,4 @@
-import axios from "axios";
-import * as SecureStore from "expo-secure-store";
-import { Platform } from "react-native";
-
-const BASE_URL = "http://192.168.1.7:3001";
-
-const api = axios.create({
-  baseURL: BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-api.interceptors.request.use(
-  async (config) => {
-    let token;
-    if (Platform.OS === "web") {
-      token = localStorage.getItem("userToken");
-    } else {
-      token = await SecureStore.getItemAsync("userToken");
-    }
-    
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
+import api from "./api";
 
 // ==================== COURSE FILE APIs ====================
 
@@ -37,7 +9,7 @@ export const getFacultyCourseTasks = async () => {
 };
 
 // Faculty - Complete a task
-export const completeCoursTask = async (taskId) => {
+export const completeCourseTask = async (taskId) => {
   const response = await api.patch(
     `/course-file-submission/complete/${taskId}`,
   );

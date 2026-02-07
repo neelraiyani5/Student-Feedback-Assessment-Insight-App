@@ -20,7 +20,7 @@ export const getAssignmentLogs = async (req, res) => {
       where: {
         courseFileAssignmentId: assignmentId,
       },
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: "desc" }, // Changed to desc for most recent first
       include: {
         user: {
           select: {
@@ -30,6 +30,7 @@ export const getAssignmentLogs = async (req, res) => {
         },
       },
     });
+
 
     res.status(200).json(logs);
   } catch (error) {

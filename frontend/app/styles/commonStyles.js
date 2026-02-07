@@ -69,3 +69,5 @@ export const commonStyles = StyleSheet.create({
     marginBottom: SPACING.m,
   },
 });
+
+export default {};

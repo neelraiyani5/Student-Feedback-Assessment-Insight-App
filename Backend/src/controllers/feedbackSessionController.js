@@ -52,6 +52,21 @@ export const startFeedbackSession = async (req, res) => {
             }
         });
 
+        // Logan: Print assigned students for verification
+        const assignedStudents = await prisma.user.findMany({
+            where: { id: { in: selectedStudents } },
+            select: { name: true, userId: true }
+        });
+
+        console.log("--------------------------------------------------");
+        console.log(`NEW FEEDBACK SESSION: ${title}`);
+        console.log(`Subject: ${session.subjectId} | Class: ${session.classId}`);
+        console.log("ASSIGNED STUDENTS:");
+        assignedStudents.forEach((s, i) => {
+            console.log(`${i + 1}. ${s.name} (${s.userId})`);
+        });
+        console.log("--------------------------------------------------");
+
         res.status(201).json(session);
     } catch (error) {
         console.error("Error starting feedback session:", error);
@@ -67,7 +82,12 @@ export const getStudentSessions = async (req, res) => {
         const sessions = await prisma.feedbackSession.findMany({
             where: {
                 assignedStudentIds: { has: studentId },
-                expiresAt: { gt: now }
+                expiresAt: { gt: now },
+                responses: {
+                    none: {
+                        studentId: studentId
+                    }
+                }
             },
             include: {
                 template: true,

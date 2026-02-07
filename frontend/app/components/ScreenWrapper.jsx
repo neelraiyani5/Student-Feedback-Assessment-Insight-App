@@ -1,24 +1,31 @@
 import React from 'react';
-import { View, StyleSheet, SafeAreaView, Platform, StatusBar } from 'react-native';
+import { View, StyleSheet, Platform, StatusBar } from 'react-native';
+import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../constants/theme';
 
 /**
  * ScreenWrapper Component
  * Handles safe area insets and standard padding for screens.
- * 
- * @param {ReactNode} children - Screen content.
- * @param {object} style - Additional styles for the content container.
- * @param {string} backgroundColor - Background color for the screen (default: theme surface).
- * @param {boolean} withPadding - Whether to apply standard horizontal padding (default: true).
  */
-const ScreenWrapper = ({ 
+const ScreenWrapperContent = ({ 
   children, 
   style, 
   backgroundColor = COLORS.surface,
   withPadding = true 
 }) => {
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor }]}>
+    <View style={[
+      styles.container, 
+      { 
+        backgroundColor,
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom,
+        paddingLeft: insets.left,
+        paddingRight: insets.right
+      }
+    ]}>
       <StatusBar 
         barStyle="dark-content" 
         backgroundColor={backgroundColor} 
@@ -33,14 +40,19 @@ const ScreenWrapper = ({
       >
         {children}
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
+
+const ScreenWrapper = (props) => (
+  <SafeAreaProvider>
+    <ScreenWrapperContent {...props} />
+  </SafeAreaProvider>
+);
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   content: {
     flex: 1,

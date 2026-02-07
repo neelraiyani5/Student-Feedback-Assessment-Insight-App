@@ -6,14 +6,16 @@ import { useRouter } from 'expo-router';
 import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
-import { getFacultyAssessments, deleteAssessment, updateAssessment } from '../../services/api';
+import { getFacultyAssessments, deleteAssessment, updateAssessment, getMyCourseAssignments, getMyProfile } from '../../services/api';
 
 const TABS = ['IA', 'CSE', 'ESE'];
 
 const AssessmentListScreen = () => {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
+    const [assignments, setAssignments] = useState([]);
     const [assessments, setAssessments] = useState([]);
+    const [selectedAssignment, setSelectedAssignment] = useState(null);
     const [activeTab, setActiveTab] = useState('IA');
 
     // Edit State
@@ -22,18 +24,32 @@ const AssessmentListScreen = () => {
     const [editForm, setEditForm] = useState({ title: '', maxMarks: '' });
 
     useEffect(() => {
-        fetchAssessments();
+        fetchInitialData();
     }, []);
 
-    const fetchAssessments = async () => {
+    const fetchInitialData = async () => {
         setLoading(true);
+        try {
+            const [assignmentsData, assessmentsData] = await Promise.all([
+                getMyCourseAssignments(),
+                getFacultyAssessments()
+            ]);
+            setAssignments(assignmentsData || []);
+            setAssessments(assessmentsData.assessments || []);
+        } catch (error) {
+            console.log("Error fetching assessment data", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchAssessments = async () => {
+        // Just refresh assessments
         try {
             const data = await getFacultyAssessments();
             setAssessments(data.assessments || []);
         } catch (error) {
-            console.log("Error fetching assessments", error);
-        } finally {
-            setLoading(false);
+            console.log("Error refreshing assessments", error);
         }
     };
 
@@ -83,20 +99,79 @@ const AssessmentListScreen = () => {
         }
     }
 
-    const filteredAssessments = assessments.filter(a => a.component === activeTab);
+    const filteredAssessments = assessments.filter(a => 
+        a.component === activeTab && 
+        selectedAssignment && 
+        a.subjectId === selectedAssignment.subjectId && 
+        a.classId === selectedAssignment.classId
+    );
+
+    if (loading) {
+        return (
+            <ScreenWrapper backgroundColor={COLORS.surfaceLight}>
+                <View style={[styles.centered, { flex: 1 }]}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <AppText style={{ marginTop: 12 }}>Loading...</AppText>
+                </View>
+            </ScreenWrapper>
+        );
+    }
+
+    if (!selectedAssignment) {
+        return (
+            <ScreenWrapper backgroundColor={COLORS.surfaceLight}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+                    </TouchableOpacity>
+                    <AppText variant="h3">Select Subject</AppText>
+                </View>
+
+                <FlatList
+                    data={assignments}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styles.listContent}
+                    renderItem={({ item }) => (
+                        <TouchableOpacity 
+                            style={styles.subjectCard} 
+                            onPress={() => setSelectedAssignment(item)}
+                        >
+                            <View style={styles.subjectIcon}>
+                                <Ionicons name="book" size={24} color={COLORS.white} />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <AppText style={styles.subjectName}>{item.subject.name}</AppText>
+                                <AppText variant="caption" color={COLORS.textSecondary}>
+                                    Class: {item.class.name}
+                                </AppText>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+                        </TouchableOpacity>
+                    )}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <AppText style={styles.emptyText}>No subjects assigned to you.</AppText>
+                        </View>
+                    }
+                />
+            </ScreenWrapper>
+        );
+    }
 
     return (
         <ScreenWrapper backgroundColor={COLORS.surfaceLight}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                <TouchableOpacity onPress={() => setSelectedAssignment(null)} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
                 </TouchableOpacity>
-                <AppText variant="h3">My Assessments</AppText>
+                <View>
+                    <AppText variant="h3">{selectedAssignment.subject.name}</AppText>
+                    <AppText variant="caption">{selectedAssignment.class.name}</AppText>
+                </View>
             </View>
 
             {/* Tabs */}
             <View style={styles.tabContainer}>
-                {/* ... existing tabs ... */}
                 {TABS.map(tab => (
                     <TouchableOpacity 
                         key={tab} 
@@ -108,59 +183,60 @@ const AssessmentListScreen = () => {
                 ))}
             </View>
 
-            {loading ? (
-                <ActivityIndicator size="large" color={COLORS.primary} style={{marginTop: 50}} />
-            ) : (
-                <FlatList 
-                    data={filteredAssessments}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={styles.listContent}
-                    renderItem={({ item }) => (
-                         <View style={styles.card}>
-                            <TouchableOpacity 
-                                onPress={() => router.push(`/assessment/${item.id}`)}
-                                style={styles.cardHeader}
-                            >
-                                <View style={{flex:1}}>
-                                    <AppText style={styles.assessmentTitle}>{item.title}</AppText>
-                                    <AppText variant="caption" style={styles.detailText}>
-                                        {item.subject?.name} • {item.class?.name}
-                                    </AppText>
-                                </View>
-                                <View style={styles.marksBadge}>
-                                    <AppText style={styles.marksText}>{item.maxMarks} Marks</AppText>
-                                </View>
-                            </TouchableOpacity>
-
-                            <View style={styles.cardFooter}>
-                                <AppText variant="caption" style={{color: COLORS.textLight}}>
-                                    Created: {new Date(item.createdAt).toLocaleDateString()}
+            <FlatList 
+                data={filteredAssessments}
+                keyExtractor={item => item.id}
+                contentContainerStyle={styles.listContent}
+                renderItem={({ item }) => (
+                     <View style={styles.card}>
+                        <TouchableOpacity 
+                            onPress={() => router.push(`/assessment/${item.id}`)}
+                            style={styles.cardHeader}
+                        >
+                            <View style={{flex:1}}>
+                                <AppText style={styles.assessmentTitle}>{item.title}</AppText>
+                                <AppText variant="caption" style={styles.detailText}>
+                                    Max Marks: {item.maxMarks}
                                 </AppText>
-                                <View style={{flexDirection:'row', gap: 16}}>
-                                     <TouchableOpacity onPress={() => openEditModal(item)}>
-                                         <Ionicons name="pencil" size={20} color={COLORS.textSecondary} />
-                                     </TouchableOpacity>
-                                     <TouchableOpacity onPress={() => handleDeleteAssessment(item)}>
-                                         <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-                                     </TouchableOpacity>
-                                     <TouchableOpacity onPress={() => router.push(`/assessment/${item.id}`)}>
-                                         <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
-                                     </TouchableOpacity>
-                                </View>
+                            </View>
+                            <View style={styles.marksBadge}>
+                                <AppText style={styles.marksText}>{item.maxMarks} Marks</AppText>
+                            </View>
+                        </TouchableOpacity>
+
+                        <View style={styles.cardFooter}>
+                            <AppText variant="caption" style={{color: COLORS.textLight}}>
+                                Created: {new Date(item.createdAt).toLocaleDateString()}
+                            </AppText>
+                            <View style={{flexDirection:'row', gap: 16}}>
+                                 <TouchableOpacity onPress={() => openEditModal(item)}>
+                                     <Ionicons name="pencil" size={20} color={COLORS.textSecondary} />
+                                 </TouchableOpacity>
+                                 <TouchableOpacity onPress={() => handleDeleteAssessment(item)}>
+                                     <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+                                 </TouchableOpacity>
                             </View>
                         </View>
-                    )}
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <AppText style={styles.emptyText}>No {activeTab} assessments found.</AppText>
-                        </View>
-                    }
-                />
-            )}
+                    </View>
+                )}
+                ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                        <AppText style={styles.emptyText}>No {activeTab} assessments found.</AppText>
+                    </View>
+                }
+            />
 
              <TouchableOpacity 
                 style={styles.fab} 
-                onPress={() => router.push('/create-assessment')}
+                onPress={() => router.push({
+                    pathname: '/create-assessment',
+                    params: { 
+                        subjectId: selectedAssignment.subjectId, 
+                        classId: selectedAssignment.classId,
+                        subjectName: selectedAssignment.subject.name,
+                        className: selectedAssignment.class.name
+                    }
+                })}
             >
                 <Ionicons name="add" size={30} color={COLORS.white} />
             </TouchableOpacity>
@@ -324,6 +400,36 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
         alignItems: 'center',
         marginTop: 10
+    },
+    subjectCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 12,
+        elevation: 2,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    subjectIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    subjectName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+    },
+    centered: {
+        justifyContent: 'center',
+        alignItems: 'center'
     }
 });
 

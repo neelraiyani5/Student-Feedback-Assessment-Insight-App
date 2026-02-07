@@ -52,6 +52,7 @@ model User {
   feedbackSessions FeedbackSession[]
   feedbackResponses FeedbackResponse[]
   courseFileAssignments CourseFileAssignment[]
+  courseFileLogs        CourseFileLog[]
   mustChangePassword Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime? @updatedAt
@@ -156,11 +157,13 @@ model CourseFileTaskSubmission {
 }
 
 model CourseFileLog {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  action      String   // e.g., "TASK_COMPLETED", "CC_REVIEWED", "HOD_REVIEWED", "FACULTY_ASSIGNED"
-  message     String   // Human-readable message
-  userName    String   // Who did it
-  userId      String   @db.ObjectId
+  id                      String   @id @default(auto()) @map("_id") @db.ObjectId
+  action                  String   // e.g., "TASK_COMPLETED", "CC_REVIEWED", "HOD_REVIEWED", "FACULTY_ASSIGNED"
+  message                 String   // Human-readable message
+  userName                String   // Who did it
+  userId                  String   @db.ObjectId
+  user                    User     @relation(fields: [userId], references: [id])
+  courseFileAssignmentId  String?  @db.ObjectId
   
   // Context
   className   String?
@@ -171,6 +174,7 @@ model CourseFileLog {
   createdAt   DateTime @default(now())
 
   @@index([createdAt])
+  @@index([courseFileAssignmentId])
 }
 
 

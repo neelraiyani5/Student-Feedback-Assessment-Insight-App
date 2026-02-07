@@ -61,37 +61,44 @@ const HodManageSubjectsScreen = () => {
     setLoading(true);
     try {
       const userData = await getMyProfile();
-      setUser(userData.user);
+      const currentUser = userData.user;
+      setUser(currentUser);
 
-      if (
-        userData.user.hodDepartments &&
-        userData.user.hodDepartments.length > 0
-      ) {
-        const deptId = userData.user.hodDepartments[0].id;
-        const deptData = await getDepartmentOverview(deptId);
-        setDepartment(deptData);
+      // Fetch department overview if HOD has a department assigned
+      if (currentUser?.hodDepartments?.length > 0) {
+        const deptId = currentUser.hodDepartments[0].id;
+        try {
+          const deptData = await getDepartmentOverview(deptId);
+          setDepartment(deptData);
+        } catch (deptErr) {
+          console.error("Failed to load department overview:", deptErr);
+        }
       }
 
-      // Load faculty list (FACULTY, CC, and HOD)
+      // Load faculty list in parallel for efficiency
       try {
-        const facultyResponse = await getUsers("FACULTY");
-        const ccResponse = await getUsers("CC");
-        const hodResponse = await getUsers("HOD");
+        const [facultyRes, ccRes, hodRes] = await Promise.all([
+          getUsers("FACULTY").catch(() => []),
+          getUsers("CC").catch(() => []),
+          getUsers("HOD").catch(() => []),
+        ]);
 
-        const facultyList = facultyResponse.users || facultyResponse || [];
-        const ccList = ccResponse.users || ccResponse || [];
-        const hodList = hodResponse.users || hodResponse || [];
+        const facultyList = facultyRes.users || facultyRes || [];
+        const ccList = ccRes.users || ccRes || [];
+        const hodList = hodRes.users || hodRes || [];
 
-        // Combine all lists
-        const allFaculty = [...facultyList, ...ccList, ...hodList];
-        setFacultyList(allFaculty);
-      } catch (err) {
-        console.error("Failed to load faculty:", err);
+        // Combine and filter unique users by ID
+        const combined = [...facultyList, ...ccList, ...hodList];
+        const uniqueFaculty = Array.from(new Map(combined.map(u => [u.id, u])).values());
+        
+        setFacultyList(uniqueFaculty);
+      } catch (userErr) {
+        console.error("Failed to load faculty lists:", userErr);
         setFacultyList([]);
       }
     } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to load data");
+      console.error("Critical error in fetchInitialData:", error);
+      Alert.alert("Error", "Could not load management data. Please try again.");
     } finally {
       setLoading(false);
     }

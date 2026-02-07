@@ -43,3 +43,5 @@ const rf = (size) => {
 };
 
 export { wp, hp, rf, SCREEN_WIDTH, SCREEN_HEIGHT };
+
+export default {};

@@ -7,6 +7,7 @@ import {
   Alert,
   RefreshControl,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -32,6 +33,8 @@ const CoordinatorDashboard = () => {
     completed: 0,
     inProgress: 0,
     pending: 0,
+    totalCount: 0,
+    completedCount: 0,
   });
   const [deptStatus, setDeptStatus] = useState([]);
   const [myAssignments, setMyAssignments] = useState([]);
@@ -42,8 +45,8 @@ const CoordinatorDashboard = () => {
     fetchDashboardData();
   }, []);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
     try {
       const profile = await getMyProfile();
       if (profile && profile.user) {
@@ -59,8 +62,12 @@ const CoordinatorDashboard = () => {
             profile.user.classesCoordinated.length > 0
           ) {
             for (const cls of profile.user.classesCoordinated) {
-              const clsAssign = await getClassCourseAssignments(cls.id);
-              adminAssignments = [...adminAssignments, ...clsAssign];
+              try {
+                const clsAssign = await getClassCourseAssignments(cls.id);
+                adminAssignments = [...adminAssignments, ...clsAssign];
+              } catch (e) {
+                console.log(`Error fetching assignments for class ${cls.id}`, e);
+              }
             }
           }
 
@@ -71,21 +78,29 @@ const CoordinatorDashboard = () => {
 
             const combinedList = classSubjects.map((subject) => {
               const assignment = adminAssignments.find(
-                (a) => a.subjectId === subject.id
+                (a) => a.subjectId === subject.id,
               );
 
-              const globalFaculty = subject.faculties && subject.faculties.length > 0
-                  ? subject.faculties.map(f => f.name).join(', ')
+              const globalFaculty =
+                subject.faculties && subject.faculties.length > 0
+                  ? subject.faculties.map((f) => f.name).join(", ")
                   : "Unassigned";
 
               if (assignment) {
+                const total = assignment.progress?.total || 0;
+                const completed = assignment.progress?.completed || 0;
+                const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
                 return {
                   id: assignment.id,
                   subjectId: subject.id,
+                  classId: assignment.classId,
                   name: subject.name,
-                  faculty: assignment.faculty.name,
+                  faculty: globalFaculty, // Use all faculties, not just the assignment's faculty
+                  facultyId: assignment.facultyId,
                   class: assignment.class.name,
-                  progress: assignment.progress,
+                  className: assignment.class.name,
+                  progress: percent,
                   isAssigned: true,
                 };
               } else {
@@ -95,7 +110,8 @@ const CoordinatorDashboard = () => {
                   name: subject.name,
                   faculty: globalFaculty,
                   class: profile.user.classesCoordinated[0]?.name || "N/A",
-                  progress: { completed: 0, total: 0 },
+                  className: profile.user.classesCoordinated[0]?.name || "N/A",
+                  progress: 0,
                   isAssigned: false,
                 };
               }
@@ -108,11 +124,12 @@ const CoordinatorDashboard = () => {
         }
 
         // 3. Fetch Personal Teaching Assignments (for "My Subjects" section)
+        let myAssign = [];
         try {
-          const myAssign = await getMyCourseAssignments();
+          myAssign = await getMyCourseAssignments();
           setMyAssignments(myAssign || []);
         } catch (e) {
-          console.log("Error fetching my assignments", e);
+          console.error("Error fetching my assignments", e);
         }
 
         // 4. Process Administrative Assignments for Stats (HOD/CC level)
@@ -130,10 +147,14 @@ const CoordinatorDashboard = () => {
 
           return {
             id: a.id,
+            subjectId: a.subjectId,
+            classId: a.classId,
             name: a.subject.name,
             className: a.class.name,
             progress: progressPercent,
             faculty: a.faculty.name,
+            facultyId: a.facultyId,
+            isAssigned: true,
             status:
               progressPercent >= 90
                 ? "Good"
@@ -148,30 +169,47 @@ const CoordinatorDashboard = () => {
           setDeptStatus(processedAdminList);
         }
 
+        // 5. Consolidate "My Subjects" logic for Dashboard
+        // For CC/HOD, "My Subjects" should include subjects they teach across ANY class
+        setMyAssignments(myAssign || []);
+
         // Calculate Aggregate Compliance for the Top Status Card
         const completedPercent =
           totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+        const getStatusColor = (percent) => {
+          if (percent >= 75) return COLORS.success;
+          if (percent >= 40) return COLORS.warning;
+          return COLORS.error;
+        };
+
+        const statusColor = getStatusColor(completedPercent);
+
         setComplianceStats({
           completed: completedPercent,
-          inProgress: 0, // Simplified for now
+          inProgress: 0,
           pending: 100 - completedPercent,
+          totalCount: totalTasks,
+          completedCount: completedTasks,
+          color: statusColor,
         });
       }
     } catch (err) {
-      console.log("Failed to load dashboard data", err);
+      console.error("Failed to load dashboard data", err);
     } finally {
-      setLoading(false);
+      if (!isRefresh) setLoading(false);
     }
   };
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    fetchDashboardData().finally(() => setRefreshing(false));
+    fetchDashboardData(true).finally(() => {
+      setRefreshing(false);
+    });
   }, []);
 
   return (
-    <ScreenWrapper backgroundColor={COLORS.surfaceLight} withPadding={false}>
+    <ScreenWrapper backgroundColor="#F1F5F9" withPadding={false}>
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -189,719 +227,593 @@ const CoordinatorDashboard = () => {
           <Ionicons name="person-circle" size={40} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
+      
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
+            Loading Dashboard...
+          </AppText>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
         {/* Main Visual: Compliance Overview */}
         <View style={styles.chartCard}>
-          <AppText variant="h3" style={styles.cardTitle}>
-            {user?.role === "HOD" ? "Department" : "Class"} Compliance
-          </AppText>
-
-          <View style={styles.chartContent}>
-            <View
-              style={{
-                width: "100%",
-                alignItems: "center",
-                paddingVertical: SPACING.m,
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "flex-end",
-                  marginBottom: SPACING.s,
-                }}
-              >
-                <AppText
-                  variant="h1"
-                  style={{ color: COLORS.primary, fontSize: 48 }}
-                >
-                  {complianceStats.completed}
-                </AppText>
-                <AppText
-                  variant="h3"
-                  style={{ color: COLORS.textSecondary, marginBottom: 8 }}
-                >
-                  %
-                </AppText>
-              </View>
-              <AppText
-                variant="body2"
-                style={{ color: COLORS.textSecondary, marginBottom: SPACING.m }}
-              >
-                Overall Completion
+          <View style={styles.chartHeader}>
+            <View>
+              <AppText variant="h3" style={styles.cardTitle}>
+                {user?.role === "HOD" ? "Department" : "Class"} Compliance
               </AppText>
+              <AppText variant="caption" style={styles.cardSubtitle}>
+                Based on Course File Submissions
+              </AppText>
+            </View>
+            <View style={[styles.complianceBadge, { 
+              backgroundColor: (complianceStats.color || COLORS.success) + '15',
+              paddingHorizontal: 8,
+              paddingVertical: 3
+            }]}>
+              <Ionicons name="ribbon" size={14} color={complianceStats.color || COLORS.success} />
+              <AppText style={{ 
+                color: complianceStats.color || COLORS.success, 
+                fontWeight: '800', 
+                marginLeft: 4,
+                fontSize: 9
+              }}>
+                {complianceStats.completed >= 75 ? 'GOOD' : complianceStats.completed >= 40 ? 'AVERAGE' : 'LOW'}
+              </AppText>
+            </View>
+          </View>
+          
+          <View style={styles.chartContent}>
+            {/* Smooth Fluid Circular Gauge */}
+            <View style={styles.gaugeContainer}>
+              <View style={styles.gaugeBackgroundTrack} />
+              <View style={styles.gaugeHalfWrapper}>
+                {/* Right Half: Handles 0-50% */}
+                <View style={[styles.gaugeHalf, { overflow: 'hidden' }]}>
+                  <View 
+                    style={[
+                      styles.gaugeProgressHalf, 
+                      { 
+                        backgroundColor: complianceStats.color || COLORS.error,
+                        transform: [
+                          { translateX: -32.5 },
+                          { rotate: `${Math.min(complianceStats.completed, 50) * 3.6}deg` },
+                          { translateX: 32.5 }
+                        ],
+                        borderTopRightRadius: 65,
+                        borderBottomRightRadius: 65,
+                        left: 65
+                      }
+                    ]} 
+                  />
+                </View>
+                {/* Left Half: Handles 51-100% */}
+                <View style={[styles.gaugeHalf, { overflow: 'hidden', transform: [{ scaleX: -1 }] }]}>
+                  {complianceStats.completed > 50 && (
+                    <View 
+                      style={[
+                        styles.gaugeProgressHalf, 
+                        { 
+                          backgroundColor: complianceStats.color || COLORS.error,
+                          transform: [
+                            { translateX: -32.5 },
+                            { rotate: `${(complianceStats.completed - 50) * 3.6}deg` },
+                            { translateX: 32.5 }
+                          ],
+                          borderTopRightRadius: 65,
+                          borderBottomRightRadius: 65,
+                          left: 65
+                        }
+                      ]} 
+                    />
+                  )}
+                </View>
+              </View>
+              
+              <View style={styles.gaugeInnerCircle}>
+                <AppText style={styles.gaugePercent}>
+                  {complianceStats.completed}<AppText style={styles.gaugeSymbol}>%</AppText>
+                </AppText>
+                <AppText variant="small" style={styles.gaugeLabel}>COMPLIANCE</AppText>
+              </View>
+            </View>
 
-              {/* Linear Progress Bar */}
-              <View
-                style={{
-                  width: "100%",
-                  height: 12,
-                  backgroundColor: COLORS.surface,
-                  borderRadius: 6,
-                  overflow: "hidden",
-                }}
-              >
-                <View
-                  style={{
-                    height: "100%",
-                    width: `${complianceStats.completed}%`,
-                    backgroundColor:
-                      complianceStats.completed >= 90
-                        ? COLORS.success
-                        : complianceStats.completed >= 50
-                          ? COLORS.warning
-                          : COLORS.error,
-                  }}
-                />
+            {/* Quick Stats */}
+            <View style={styles.statsOverview}>
+              <View style={styles.statSubItem}>
+                <View style={[styles.statDot, { backgroundColor: COLORS.success }]} />
+                <View>
+                  <AppText style={styles.statValueText}>{complianceStats.completedCount}</AppText>
+                  <AppText variant="small" style={styles.statLabelText}>Completed</AppText>
+                </View>
+              </View>
+              <View style={styles.statSubItem}>
+                <View style={[styles.statDot, { backgroundColor: COLORS.warning }]} />
+                <View>
+                  <AppText style={styles.statValueText}>{complianceStats.totalCount - complianceStats.completedCount}</AppText>
+                  <AppText variant="small" style={styles.statLabelText}>Pending</AppText>
+                </View>
               </View>
             </View>
           </View>
         </View>
-
-        {/* My Subjects Section - HOD & CC */}
-        {(user?.role === "HOD" || user?.role === "CC") &&
-          myAssignments &&
-          myAssignments.length > 0 && (
-            <View style={styles.section}>
-              <AppText variant="h3" style={styles.sectionTitle}>
-                My Subjects (Teaching)
-              </AppText>
-              <FlatList
-                data={myAssignments}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-                renderItem={({ item: assignment }) => (
-                  <TouchableOpacity
-                    style={styles.subjectItemCard}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/course-checklist",
-                        params: {
-                          assignmentId: assignment.id,
-                        },
-                      })
-                    }
-                  >
-                    <View style={styles.subjectItemContent}>
-                      <AppText style={styles.subjectItemName}>
-                        {assignment.subject.name}
-                      </AppText>
-                      {assignment.class && (
-                        <AppText
-                          variant="caption"
-                          style={styles.subjectItemMeta}
-                        >
-                          Class: {assignment.class.name}
-                        </AppText>
-                      )}
-                    </View>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={24}
-                      color={COLORS.textLight}
-                    />
-                  </TouchableOpacity>
-                )}
-              />
-            </View>
-          )}
-
-        {/* Administration Section */}
+{/* Administration Section */}
         <View style={styles.section}>
           <AppText variant="h3" style={styles.sectionTitle}>
             Administration
           </AppText>
 
-          {/* HOD Features */}
-          {(user?.role === "HOD" || !user) && (
-            <>
-              <TouchableOpacity
-                style={styles.adminCard}
-                onPress={() => router.push("/manage-faculty")}
-              >
-                <View style={styles.adminIconContainer}>
-                  <Ionicons name="people" size={24} color={COLORS.white} />
-                </View>
-                <View style={styles.adminContent}>
-                  <AppText style={styles.adminTitle}>Manage Faculty</AppText>
-                  <AppText variant="caption" style={styles.adminSubtitle}>
-                    Add faculty, View list, Promote to CC
-                  </AppText>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={COLORS.textLight}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.adminCard}
-                onPress={() => router.push("/manage-templates")}
-              >
-                <View
-                  style={[
-                    styles.adminIconContainer,
-                    { backgroundColor: "#9333EA" },
-                  ]}
-                >
-                  <Ionicons name="list" size={24} color={COLORS.white} />
-                </View>
-                <View style={styles.adminContent}>
-                  <AppText style={styles.adminTitle}>
-                    Course File Format
-                  </AppText>
-                  <AppText variant="caption" style={styles.adminSubtitle}>
-                    Edit Task Templates & Checklists
-                  </AppText>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={COLORS.textLight}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.adminCard}
-                onPress={() => router.push("/manage-curriculum")}
-              >
-                <View
-                  style={[
-                    styles.adminIconContainer,
-                    { backgroundColor: COLORS.secondary },
-                  ]}
-                >
-                  <Ionicons name="school" size={24} color={COLORS.white} />
-                </View>
-                <View style={styles.adminContent}>
-                  <AppText style={styles.adminTitle}>
-                    Semester Management
-                  </AppText>
-                  <AppText variant="caption" style={styles.adminSubtitle}>
-                    Manage Dept, Semesters, Promote Classes
-                  </AppText>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={COLORS.textLight}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.adminCard}
-                onPress={() => router.push("/feedback/template/manage")}
-              >
-                <View
-                  style={[
-                    styles.adminIconContainer,
-                    { backgroundColor: "#8B5CF6" },
-                  ]}
-                >
-                  <Ionicons
-                    name="document-text"
-                    size={24}
-                    color={COLORS.white}
-                  />
-                </View>
-                <View style={styles.adminContent}>
-                  <AppText style={styles.adminTitle}>
-                    Feedback Templates
-                  </AppText>
-                  <AppText variant="caption" style={styles.adminSubtitle}>
-                    Create & Manage Feedback Forms
-                  </AppText>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={COLORS.textLight}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.adminCard}
-                onPress={() => router.push("/feedback/monitoring")}
-              >
-                <View
-                  style={[
-                    styles.adminIconContainer,
-                    { backgroundColor: "#10B981" },
-                  ]}
-                >
-                  <Ionicons name="stats-chart" size={24} color={COLORS.white} />
-                </View>
-                <View style={styles.adminContent}>
-                  <AppText style={styles.adminTitle}>Feedback Reports</AppText>
-                  <AppText variant="caption" style={styles.adminSubtitle}>
-                    View Session Responses
-                  </AppText>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={COLORS.textLight}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.adminCard}
-                onPress={() => router.push("/hod-manage-subjects")}
-              >
-                <View
-                  style={[
-                    styles.adminIconContainer,
-                    { backgroundColor: COLORS.warning },
-                  ]}
-                >
-                  <Ionicons name="book" size={24} color={COLORS.white} />
-                </View>
-                <View style={styles.adminContent}>
-                  <AppText style={styles.adminTitle}>Manage Subjects</AppText>
-                  <AppText variant="caption" style={styles.adminSubtitle}>
-                    Create & Assign Faculty to Subjects
-                  </AppText>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={COLORS.textLight}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.adminCard}
-                onPress={() => router.push("/hod-course-file-review")}
-              >
-                <View
-                  style={[
-                    styles.adminIconContainer,
-                    { backgroundColor: "#3B82F6" },
-                  ]}
-                >
-                  <Ionicons
-                    name="document-text"
-                    size={24}
-                    color={COLORS.white}
-                  />
-                </View>
-                <View style={styles.adminContent}>
-                  <AppText style={styles.adminTitle}>
-                    Review Course Files
-                  </AppText>
-                  <AppText variant="caption" style={styles.adminSubtitle}>
-                    Review Faculty Course File Submissions
-                  </AppText>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={COLORS.textLight}
-                />
-              </TouchableOpacity>
-
-              {user?.subjects && user.subjects.length > 0 && (
+          <View style={styles.adminGrid}>
+            {/* HOD Features */}
+            {(user?.role === "HOD" || !user) && (
+              <>
                 <TouchableOpacity
                   style={styles.adminCard}
-                  onPress={() => router.push("/feedback/session/start")}
+                  onPress={() => router.push("/manage-faculty")}
+                >
+                  <View style={styles.adminIconContainer}>
+                    <Ionicons name="people" size={24} color={COLORS.white} />
+                  </View>
+                  <View style={styles.adminContent}>
+                    <AppText style={styles.adminTitle}>Manage Faculty</AppText>
+                    <AppText variant="caption" style={styles.adminSubtitle}>
+                      Faculty & CCs
+                    </AppText>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.adminCard}
+                  onPress={() => router.push("/manage-templates")}
                 >
                   <View
                     style={[
                       styles.adminIconContainer,
-                      { backgroundColor: COLORS.accent },
+                      { backgroundColor: "#9333EA" },
+                    ]}
+                  >
+                    <Ionicons name="list" size={24} color={COLORS.white} />
+                  </View>
+                  <View style={styles.adminContent}>
+                    <AppText style={styles.adminTitle}>
+                      Course File Format
+                    </AppText>
+                    <AppText variant="caption" style={styles.adminSubtitle}>
+                      Checklists
+                    </AppText>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.adminCard}
+                  onPress={() => router.push("/manage-curriculum")}
+                >
+                  <View
+                    style={[
+                      styles.adminIconContainer,
+                      { backgroundColor: COLORS.secondary },
+                    ]}
+                  >
+                    <Ionicons name="school" size={24} color={COLORS.white} />
+                  </View>
+                  <View style={styles.adminContent}>
+                    <AppText style={styles.adminTitle}>
+                      Curriculum
+                    </AppText>
+                    <AppText variant="caption" style={styles.adminSubtitle}>
+                      Semesters & Dept
+                    </AppText>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.adminCard}
+                  onPress={() => router.push("/feedback/template/manage")}
+                >
+                  <View
+                    style={[
+                      styles.adminIconContainer,
+                      { backgroundColor: "#8B5CF6" },
                     ]}
                   >
                     <Ionicons
-                      name="chatbox-ellipses"
+                      name="document-text"
                       size={24}
                       color={COLORS.white}
                     />
                   </View>
                   <View style={styles.adminContent}>
                     <AppText style={styles.adminTitle}>
-                      Start Feedback Session
+                      Feedback Templates
                     </AppText>
                     <AppText variant="caption" style={styles.adminSubtitle}>
-                      Initiate for your subjects
+                      Manage Forms
                     </AppText>
                   </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={24}
-                    color={COLORS.textLight}
-                  />
                 </TouchableOpacity>
-              )}
-            </>
-          )}
 
-          {/* CC Features */}
-          {user?.role === "CC" && (
-            <>
-              <TouchableOpacity
-                style={styles.adminCard}
-                onPress={() => router.push("/manage-students")}
-              >
-                <View
-                  style={[
-                    styles.adminIconContainer,
-                    { backgroundColor: COLORS.info },
-                  ]}
-                >
-                  <Ionicons
-                    name="people-circle"
-                    size={24}
-                    color={COLORS.white}
-                  />
-                </View>
-                <View style={styles.adminContent}>
-                  <AppText style={styles.adminTitle}>
-                    My Class & Students
-                  </AppText>
-                  <AppText variant="caption" style={styles.adminSubtitle}>
-                    Manage Students, View Class Details
-                  </AppText>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={COLORS.textLight}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.adminCard}
-                onPress={() => router.push("/manage-subjects")}
-              >
-                <View
-                  style={[
-                    styles.adminIconContainer,
-                    { backgroundColor: COLORS.warning },
-                  ]}
-                >
-                  <Ionicons name="book" size={24} color={COLORS.white} />
-                </View>
-                <View style={styles.adminContent}>
-                  <AppText style={styles.adminTitle}>Manage Subjects</AppText>
-                  <AppText variant="caption" style={styles.adminSubtitle}>
-                    Add Subjects, Assign Faculty
-                  </AppText>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={COLORS.textLight}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.adminCard}
-                onPress={() => router.push("/feedback/monitoring")}
-              >
-                <View
-                  style={[
-                    styles.adminIconContainer,
-                    { backgroundColor: "#10B981" },
-                  ]}
-                >
-                  <Ionicons name="stats-chart" size={24} color={COLORS.white} />
-                </View>
-                <View style={styles.adminContent}>
-                  <AppText style={styles.adminTitle}>Feedback Reports</AppText>
-                  <AppText variant="caption" style={styles.adminSubtitle}>
-                    View Session Responses
-                  </AppText>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={COLORS.textLight}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.adminCard}
-                onPress={() => router.push("/cc-course-file-review")}
-              >
-                <View
-                  style={[
-                    styles.adminIconContainer,
-                    { backgroundColor: "#06B6D4" },
-                  ]}
-                >
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={24}
-                    color={COLORS.white}
-                  />
-                </View>
-                <View style={styles.adminContent}>
-                  <AppText style={styles.adminTitle}>
-                    Review Course Files
-                  </AppText>
-                  <AppText variant="caption" style={styles.adminSubtitle}>
-                    Review Faculty Course File Submissions
-                  </AppText>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={COLORS.textLight}
-                />
-              </TouchableOpacity>
-
-              {user?.subjects && user.subjects.length > 0 && (
                 <TouchableOpacity
                   style={styles.adminCard}
-                  onPress={() => router.push("/feedback/session/start")}
+                  onPress={() => router.push("/feedback/monitoring")}
                 >
                   <View
                     style={[
                       styles.adminIconContainer,
-                      { backgroundColor: COLORS.accent },
+                      { backgroundColor: "#10B981" },
+                    ]}
+                  >
+                    <Ionicons name="stats-chart" size={24} color={COLORS.white} />
+                  </View>
+                  <View style={styles.adminContent}>
+                    <AppText style={styles.adminTitle}>Feedback Reports</AppText>
+                    <AppText variant="caption" style={styles.adminSubtitle}>
+                      View Results
+                    </AppText>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.adminCard}
+                  onPress={() => router.push("/hod-manage-subjects")}
+                >
+                  <View
+                    style={[
+                      styles.adminIconContainer,
+                      { backgroundColor: COLORS.warning },
+                    ]}
+                  >
+                    <Ionicons name="book" size={24} color={COLORS.white} />
+                  </View>
+                  <View style={styles.adminContent}>
+                    <AppText style={styles.adminTitle}>Manage Subjects</AppText>
+                    <AppText variant="caption" style={styles.adminSubtitle}>
+                      Assign Faculty
+                    </AppText>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.adminCard}
+                  onPress={() => router.push("/hod-course-file-review")}
+                >
+                  <View
+                    style={[
+                      styles.adminIconContainer,
+                      { backgroundColor: "#3B82F6" },
                     ]}
                   >
                     <Ionicons
-                      name="chatbox-ellipses"
+                      name="document-text"
                       size={24}
                       color={COLORS.white}
                     />
                   </View>
                   <View style={styles.adminContent}>
                     <AppText style={styles.adminTitle}>
-                      Start Feedback Session
+                      Review Course Files
                     </AppText>
                     <AppText variant="caption" style={styles.adminSubtitle}>
-                      Initiate for your subjects
+                      Monitor Submissions
                     </AppText>
                   </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={24}
-                    color={COLORS.textLight}
-                  />
                 </TouchableOpacity>
-              )}
-            </>
-          )}
-        </View>
 
-        {/* View Course File Review Status */}
-        {user?.role === "FACULTY" && (
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={styles.adminCard}
-              onPress={() => router.push("/my-course-files")}
-            >
-              <View
-                style={[
-                  styles.adminIconContainer,
-                  { backgroundColor: "#F59E0B" },
-                ]}
-              >
-                <Ionicons
-                  name="document-attach"
-                  size={24}
-                  color={COLORS.white}
-                />
-              </View>
-              <View style={styles.adminContent}>
-                <AppText style={styles.adminTitle}>
-                  My Submitted Course Files
-                </AppText>
-                <AppText variant="caption" style={styles.adminSubtitle}>
-                  View CC & HOD Review Status with Remarks
-                </AppText>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={24}
-                color={COLORS.textLight}
-              />
-            </TouchableOpacity>
+                {myAssignments.length > 0 && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.adminCard}
+                      onPress={() => router.push("/assessments")}
+                    >
+                      <View
+                        style={[
+                          styles.adminIconContainer,
+                          { backgroundColor: COLORS.primary },
+                        ]}
+                      >
+                        <Ionicons name="clipboard" size={24} color={COLORS.white} />
+                      </View>
+                      <View style={styles.adminContent}>
+                        <AppText style={styles.adminTitle}>My Assessments</AppText>
+                        <AppText variant="caption" style={styles.adminSubtitle}>
+                          Manage Marks
+                        </AppText>
+                      </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.adminCard}
+                      onPress={() => router.push("/feedback/session/start")}
+                    >
+                      <View
+                        style={[
+                          styles.adminIconContainer,
+                          { backgroundColor: COLORS.accent },
+                        ]}
+                      >
+                        <Ionicons
+                          name="chatbox-ellipses"
+                          size={24}
+                          color={COLORS.white}
+                        />
+                      </View>
+                      <View style={styles.adminContent}>
+                        <AppText style={styles.adminTitle}>
+                          Start Feedback
+                        </AppText>
+                        <AppText variant="caption" style={styles.adminSubtitle}>
+                          For your subjects
+                        </AppText>
+                      </View>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* CC Features */}
+            {user?.role === "CC" && (
+              <>
+                <TouchableOpacity
+                  style={styles.adminCard}
+                  onPress={() => router.push("/manage-students")}
+                >
+                  <View
+                    style={[
+                      styles.adminIconContainer,
+                      { backgroundColor: COLORS.info },
+                    ]}
+                  >
+                    <Ionicons
+                      name="people-circle"
+                      size={24}
+                      color={COLORS.white}
+                    />
+                  </View>
+                  <View style={styles.adminContent}>
+                    <AppText style={styles.adminTitle}>
+                      My students
+                    </AppText>
+                    <AppText variant="caption" style={styles.adminSubtitle}>
+                       View Class Overview
+                    </AppText>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.adminCard}
+                  onPress={() => router.push("/manage-subjects")}
+                >
+                  <View
+                    style={[
+                      styles.adminIconContainer,
+                      { backgroundColor: COLORS.warning },
+                    ]}
+                  >
+                    <Ionicons name="book" size={24} color={COLORS.white} />
+                  </View>
+                  <View style={styles.adminContent}>
+                    <AppText style={styles.adminTitle}>Manage Subjects</AppText>
+                    <AppText variant="caption" style={styles.adminSubtitle}>
+                      Assign Faculty
+                    </AppText>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.adminCard}
+                  onPress={() => router.push("/feedback/monitoring")}
+                >
+                  <View
+                    style={[
+                      styles.adminIconContainer,
+                      { backgroundColor: "#10B981" },
+                    ]}
+                  >
+                    <Ionicons name="stats-chart" size={24} color={COLORS.white} />
+                  </View>
+                  <View style={styles.adminContent}>
+                    <AppText style={styles.adminTitle}>Feedback Reports</AppText>
+                    <AppText variant="caption" style={styles.adminSubtitle}>
+                      View Results
+                    </AppText>
+                  </View>
+                </TouchableOpacity>
+
+                {myAssignments.length > 0 && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.adminCard}
+                      onPress={() => router.push("/assessments")}
+                    >
+                      <View
+                        style={[
+                          styles.adminIconContainer,
+                          { backgroundColor: COLORS.primary },
+                        ]}
+                      >
+                        <Ionicons name="clipboard" size={24} color={COLORS.white} />
+                      </View>
+                      <View style={styles.adminContent}>
+                        <AppText style={styles.adminTitle}>My Assessments</AppText>
+                        <AppText variant="caption" style={styles.adminSubtitle}>
+                          Manage Marks
+                        </AppText>
+                      </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.adminCard}
+                      onPress={() => router.push("/feedback/session/start")}
+                    >
+                      <View
+                        style={[
+                          styles.adminIconContainer,
+                          { backgroundColor: COLORS.accent },
+                        ]}
+                      >
+                        <Ionicons
+                          name="chatbox-ellipses"
+                          size={24}
+                          color={COLORS.white}
+                        />
+                      </View>
+                      <View style={styles.adminContent}>
+                        <AppText style={styles.adminTitle}>
+                          Start Feedback
+                        </AppText>
+                        <AppText variant="caption" style={styles.adminSubtitle}>
+                          For your subjects
+                        </AppText>
+                      </View>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </>
+            )}
           </View>
-        )}
-
-        {/* My Assessments */}
-        {/* <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.adminCard}
-            onPress={() => router.push("/assessments")}
-          >
-            <View
-              style={[
-                styles.adminIconContainer,
-                { backgroundColor: COLORS.primary },
-              ]}
-            >
-              <Ionicons name="clipboard" size={24} color={COLORS.white} />
-            </View>
-            <View style={styles.adminContent}>
-              <AppText style={styles.adminTitle}>My Assessments</AppText>
-              <AppText variant="caption" style={styles.adminSubtitle}>
-                Manage Marks for your subjects
-              </AppText>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={24}
-              color={COLORS.textLight}
-            />
-          </TouchableOpacity>
-        </View> */}
-
-        {/* Class/Department Status View - Only for CC */}
-        {user?.role === "CC" && (
-          <View style={styles.section}>
+        </View>
+        {/* Class/Department Subjects Section */}
+        <View style={styles.section}>
+          {user?.role === "CC" && (
             <AppText variant="h3" style={styles.sectionTitle}>
-              Class Course Files
+              My Class Subjects
             </AppText>
-            {deptStatus.length > 0 ? (
-              deptStatus.map((subject) => (
+          )}
+          {user?.role === "CC" && deptStatus.length > 0 ? (
+            deptStatus.map((item) => {
+              // Check if the current user is the faculty for this item
+              const isMe = item.isAssigned && (
+                item.facultyId === user.id || 
+                (item.faculty && item.faculty.includes(user.name))
+              );
+
+              return (
                 <TouchableOpacity
-                  key={subject.id}
-                  style={styles.subjectCard}
+                  key={item.id}
+                  style={[
+                    styles.subjectItemCard,
+                    isMe && { borderLeftColor: COLORS.success }
+                  ]}
                   onPress={() => {
-                    if (subject.isAssigned) {
-                      router.push(
-                        `/course-file-review?assignmentId=${subject.id}`,
-                      );
+                    if (item.isAssigned) {
+                      if (isMe) {
+                        router.push(`/course-checklist?assignmentId=${item.id}`);
+                      } else {
+                        router.push(`/course-file-review?assignmentId=${item.id}`);
+                      }
                     } else {
-                      router.push("/manage-subjects");
+                      router.push("/hod-manage-subjects");
                     }
                   }}
                 >
-                  <View style={styles.subjectHeader}>
-                    <View style={{ flex: 1 }}>
-                      <AppText style={styles.subjectName}>
-                        {subject.name}
+                  <View style={styles.subjectItemContent}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <AppText style={styles.subjectItemName}>
+                        {item.name}
                       </AppText>
-                      <AppText
-                        variant="caption"
-                        style={{
-                          color: subject.isAssigned
-                            ? COLORS.textSecondary
-                            : COLORS.error,
-                        }}
-                      >
-                        Faculty: {subject.faculty}
-                      </AppText>
+                      {isMe && (
+                        <View style={[styles.badge, { backgroundColor: COLORS.success + '20' }]}>
+                          <AppText style={{ color: COLORS.success, fontSize: 10, fontWeight: '700' }}>TEACHING</AppText>
+                        </View>
+                      )}
+                      {!isMe && item.isAssigned && (
+                        <View style={[styles.badge, { backgroundColor: COLORS.primary + '20' }]}>
+                          <AppText style={{ color: COLORS.primary, fontSize: 10, fontWeight: '700' }}>MONITORING</AppText>
+                        </View>
+                      )}
                     </View>
-                    {subject.isAssigned ? (
-                      <View style={styles.progressBadge}>
-                        <AppText style={styles.progressText}>
-                          {subject.progress.total > 0
-                            ? Math.round(
-                                (subject.progress.completed /
-                                  subject.progress.total) *
-                                  100,
-                              )
-                            : 0}
-                          %
+                    
+                    <AppText variant="caption" style={styles.subjectItemMeta}>
+                      Faculty: {item.faculty}
+                    </AppText>
+                    {item.className && (
+                      <AppText variant="caption" style={styles.subjectItemMeta}>
+                        Class: {item.className || item.class}
+                      </AppText>
+                    )}
+
+                    {item.isAssigned ? (
+                      <View style={{ marginTop: 8 }}>
+                        <View style={styles.progressBarBg}>
+                          <View 
+                            style={[
+                              styles.progressBarFill, 
+                              { 
+                                width: `${item.progress || 0}%`,
+                                backgroundColor: (item.progress || 0) >= 90 ? COLORS.success : (item.progress || 0) >= 50 ? COLORS.warning : COLORS.error
+                              }
+                            ]} 
+                          />
+                        </View>
+                        <AppText variant="caption" style={{ color: COLORS.textSecondary, marginTop: 4 }}>
+                          Progress: {item.progress || 0}%
                         </AppText>
                       </View>
                     ) : (
-                      <View
-                        style={[
-                          styles.progressBadge,
-                          { backgroundColor: COLORS.error + "20" },
-                        ]}
-                      >
-                        <AppText style={{ color: COLORS.error, fontSize: 10 }}>
-                          Unassigned
-                        </AppText>
-                      </View>
+                      <AppText variant="caption" style={{ color: COLORS.error, marginTop: 4 }}>
+                        Not Assigned - Setup Required
+                      </AppText>
                     )}
                   </View>
-
-                  {subject.isAssigned ? (
-                    <View style={styles.progressContainer}>
-                      <View style={styles.progressBarBg}>
-                        <View
-                          style={[
-                            styles.progressBarFill,
-                            {
-                              width: `${
-                                subject.progress.total > 0
-                                  ? (subject.progress.completed /
-                                      subject.progress.total) *
-                                    100
-                                  : 0
-                              }%`,
-                              backgroundColor:
-                                subject.progress.completed /
-                                  subject.progress.total >=
-                                0.9
-                                  ? COLORS.success
-                                  : subject.progress.completed /
-                                      subject.progress.total >=
-                                    0.5
-                                    ? COLORS.warning
-                                    : COLORS.error,
-                            },
-                          ]}
-                        />
-                      </View>
-                      <AppText variant="caption" style={styles.progressText}>
-                        {subject.progress.completed}/{subject.progress.total}
-                      </AppText>
-                    </View>
-                  ) : (
-                    <View style={{ marginTop: 10 }}>
-                      <AppText
-                        variant="caption"
-                        style={{ color: COLORS.primary, fontWeight: '600' }}
-                      >
-                        {subject.faculty !== "Unassigned" 
-                          ? "Initialize Course File →" 
-                          : "Tap to assign faculty →"}
-                      </AppText>
-                    </View>
-                  )}
-
-                  {subject.isAssigned && (
-                    <View
-                      style={{
-                        marginTop: 8,
-                        flexDirection: "row",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Ionicons
-                        name="eye-outline"
-                        size={14}
-                        color={COLORS.primary}
-                        style={{ marginRight: 4 }}
-                      />
-                      <AppText
-                        variant="small"
-                        style={{ color: COLORS.primary }}
-                      >
-                        Review Tasks
-                      </AppText>
-                    </View>
-                  )}
+                  <Ionicons
+                    name="chevron-forward"
+                    size={24}
+                    color={COLORS.textLight}
+                  />
                 </TouchableOpacity>
-              ))
-            ) : (
-              <View style={{ padding: SPACING.m }}>
-                <AppText
-                  style={{ color: COLORS.textSecondary, fontStyle: "italic" }}
-                >
-                  No assignments found for your class.
-                </AppText>
-              </View>
-            )}
+              );
+            })
+          ) : user?.role === "CC" ? (
+            <View style={styles.emptyContainer}>
+              <AppText style={styles.emptyText}>No subjects tracked yet.</AppText>
+            </View>
+          ) : null}
+        </View>
+
+        {/* My Assignments from other classes (if HOD/CC teaches elsewhere) */}
+        {myAssignments.length > 0 && (
+          <View style={styles.section}>
+            <AppText variant="h3" style={styles.sectionTitle}>
+              My Subject Course Files
+            </AppText>
+            {myAssignments
+              .map((assignment) => (
+              <TouchableOpacity
+                key={assignment.id}
+                style={styles.subjectItemCard}
+                onPress={() =>
+                  router.push(`/course-checklist?assignmentId=${assignment.id}`)
+                }
+              >
+                <View style={styles.subjectItemContent}>
+                  <AppText style={styles.subjectItemName}>
+                    {assignment.subject.name}
+                  </AppText>
+                  <AppText variant="caption" style={styles.subjectItemMeta}>
+                    Class: {assignment.class.name}
+                  </AppText>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={24}
+                  color={COLORS.textLight}
+                />
+              </TouchableOpacity>
+            ))}
           </View>
         )}
-      </ScrollView>
+
+        
+
+        </ScrollView>
+      )}
     </ScreenWrapper>
   );
 };
@@ -928,20 +840,118 @@ const styles = StyleSheet.create({
     padding: SPACING.l,
     marginBottom: SPACING.l,
     shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.l,
   },
   cardTitle: {
-    marginBottom: SPACING.l,
     color: COLORS.textPrimary,
-    textAlign: "center",
+    fontWeight: '700',
+  },
+  cardSubtitle: {
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  complianceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.success + '15',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
   chartContent: {
     flexDirection: "row",
-    justifyContent: "space-around",
     alignItems: "center",
+    justifyContent: "space-around",
+  },
+  gaugeContainer: {
+    width: 130,
+    height: 130,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: SPACING.m,
+  },
+  gaugeBackgroundTrack: {
+    position: 'absolute',
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    borderWidth: 12,
+    borderColor: COLORS.surface,
+  },
+  gaugeHalfWrapper: {
+    position: 'absolute',
+    width: 130,
+    height: 130,
+    flexDirection: 'row',
+  },
+  gaugeHalf: {
+    width: 65,
+    height: 130,
+  },
+  gaugeProgressHalf: {
+    position: 'absolute',
+    width: 65,
+    height: 130,
+    borderTopRightRadius: 65,
+    borderBottomRightRadius: 65,
+  },
+  gaugeInnerCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+  },
+  gaugePercent: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  gaugeSymbol: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  gaugeLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.textLight,
+    letterSpacing: 0.5,
+  },
+  statsOverview: {
+    gap: SPACING.l,
+  },
+  statSubItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.m,
+  },
+  statDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  statValueText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  statLabelText: {
+    color: COLORS.textSecondary,
   },
   donutContainer: {
     width: 140,
@@ -1068,9 +1078,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.textSecondary,
   },
-  adminCard: {
+  adminGrid: {
     flexDirection: "row",
-    alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  adminCard: {
+    width: "48.5%",
     backgroundColor: COLORS.white,
     borderRadius: LAYOUT.radius.m,
     padding: SPACING.m,
@@ -1080,27 +1094,33 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 110,
   },
   adminIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: COLORS.primary,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: SPACING.m,
+    marginBottom: SPACING.s,
   },
   adminContent: {
-    flex: 1,
+    alignItems: "center",
   },
   adminTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "700",
     color: COLORS.textPrimary,
-    marginBottom: 2,
+    textAlign: "center",
+    marginBottom: 1,
   },
   adminSubtitle: {
+    fontSize: 10,
     color: COLORS.textSecondary,
+    textAlign: "center",
   },
   subjectItemCard: {
     backgroundColor: COLORS.white,
@@ -1126,6 +1146,25 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginBottom: 2,
   },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  emptyContainer: {
+    padding: SPACING.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }
 });
 
 export default CoordinatorDashboard;

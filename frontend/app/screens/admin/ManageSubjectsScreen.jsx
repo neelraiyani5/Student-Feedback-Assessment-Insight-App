@@ -38,10 +38,14 @@ const ManageSubjectsScreen = () => {
         setLoading(true);
         try {
             const data = await getSubjects();
-            setSubjects(data.subjects || []);
+            if (data && data.subjects) {
+                setSubjects(data.subjects);
+            } else {
+                setSubjects([]);
+            }
         } catch (error) {
-            Alert.alert("Error", "Failed to fetch subjects");
-            console.error(error);
+            console.error("Fetch Data Error:", error);
+            Alert.alert("Error", "Failed to fetch subjects. Please check your connection.");
         } finally {
             setLoading(false);
         }

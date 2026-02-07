@@ -17,7 +17,10 @@ export const getFacultyTasks = async (req, res) => {
           },
         },
       },
-      orderBy: { deadline: "asc" },
+      orderBy: [
+        { deadline: "asc" },
+        { id: "asc" }
+      ],
     });
     res.status(200).json(tasks);
   } catch (error) {
@@ -40,7 +43,10 @@ export const getAssignmentTasks = async (req, res) => {
           },
         },
       },
-      orderBy: { deadline: "asc" },
+      orderBy: [
+        { deadline: "asc" },
+        { id: "asc" } 
+      ],
     });
     res.status(200).json(tasks);
   } catch (error) {
@@ -50,8 +56,8 @@ export const getAssignmentTasks = async (req, res) => {
 
 /**
  * Get tasks for CC/HOD review
- * Only shows tasks that have been COMPLETED by faculty
- * This ensures faculty must complete the task before any review can happen
+ * Shows ALL tasks so reviewer can see overall progress
+ * Tasks not yet completed by faculty are marked as pending faculty action
  */
 export const getReviewableTasks = async (req, res) => {
   try {
@@ -96,11 +102,10 @@ export const getReviewableTasks = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized role" });
     }
 
-    // Get only COMPLETED tasks - these are the reviewable ones
+    // Get ALL tasks - show full picture to reviewer
     const tasks = await prisma.courseFileTaskSubmission.findMany({
       where: {
         assignmentId,
-        status: "COMPLETED", // Only show tasks that faculty has completed
       },
       include: {
         template: { select: { id: true, title: true, description: true } },
@@ -112,40 +117,59 @@ export const getReviewableTasks = async (req, res) => {
           },
         },
       },
-      orderBy: { deadline: "asc" },
+      orderBy: [
+        { deadline: "asc" },
+        { id: "asc" } 
+      ],
     });
 
     // Enrich with review metadata
-    const enrichedTasks = tasks.map((task) => ({
-      id: task.id,
-      taskId: task.id,
-      template: task.template,
-      deadline: task.deadline,
-      status: task.status,
-      completedAt: task.completedAt,
+    const enrichedTasks = tasks.map((task) => {
+      const isCompleted = task.status === "COMPLETED";
+      
+      return {
+        id: task.id,
+        taskId: task.id,
+        template: task.template,
+        deadline: task.deadline,
+        status: task.status,
+        completedAt: task.completedAt,
 
-      // Review status
-      ccReviewed: task.ccStatus !== "PENDING",
-      ccStatus: task.ccStatus,
-      ccRemarks: task.ccRemarks,
-      ccReviewDate: task.ccReviewDate,
+        // Faculty completion status
+        pendingFacultyAction: !isCompleted,
+        
+        // Review status
+        ccReviewed: task.ccStatus !== "PENDING",
+        ccStatus: task.ccStatus,
+        ccRemarks: task.ccRemarks,
+        ccReviewDate: task.ccReviewDate,
 
-      hodReviewed: task.hodStatus !== "PENDING",
-      hodStatus: task.hodStatus,
-      hodRemarks: task.hodRemarks,
-      hodReviewDate: task.hodReviewDate,
+        hodReviewed: task.hodStatus !== "PENDING",
+        hodStatus: task.hodStatus,
+        hodRemarks: task.hodRemarks,
+        hodReviewDate: task.hodReviewDate,
 
-      // For current reviewer
-      requiresCCReview: task.ccStatus === "PENDING" && role === "CC",
-      requiresHodReview:
-        task.ccStatus !== "PENDING" &&
-        task.hodStatus === "PENDING" &&
-        role === "HOD",
-      isReviewable:
-        role === "CC"
-          ? task.ccStatus === "PENDING"
-          : task.ccStatus !== "PENDING" && task.hodStatus === "PENDING",
-    }));
+        // For current reviewer
+        requiresCCReview: isCompleted && task.ccStatus === "PENDING" && role === "CC",
+        requiresHodReview:
+          isCompleted &&
+          task.ccStatus === "YES" &&
+          task.hodStatus === "PENDING" &&
+          role === "HOD",
+        isReviewable:
+          isCompleted && (
+            role === "CC"
+              ? task.ccStatus === "PENDING"
+              : task.ccStatus === "YES" && task.hodStatus === "PENDING"
+          ),
+      };
+    });
+
+    // Calculate stats
+    const completedCount = enrichedTasks.filter(t => t.status === "COMPLETED").length;
+    const pendingCount = enrichedTasks.filter(t => t.status === "PENDING").length;
+    const ccReviewedCount = enrichedTasks.filter(t => t.ccReviewed && t.status === "COMPLETED").length;
+    const hodReviewedCount = enrichedTasks.filter(t => t.hodReviewed && t.status === "COMPLETED").length;
 
     res.status(200).json({
       assignment: {
@@ -153,7 +177,11 @@ export const getReviewableTasks = async (req, res) => {
         subject: assignment.subject.name,
         faculty: assignment.faculty.name,
         className: assignment.class.name,
-        totalTasks: enrichedTasks.length,
+        totalTasksInAssignment: enrichedTasks.length,
+        completedByFaculty: completedCount,
+        pendingFromFaculty: pendingCount,
+        ccReviewedCount,
+        hodReviewedCount,
       },
       tasks: enrichedTasks,
     });
@@ -212,11 +240,10 @@ export const getSubjectReviewableTasks = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized role" });
     }
 
-    // Get only COMPLETED tasks - these are the reviewable ones
+    // Get ALL tasks - show full picture to reviewer
     const tasks = await prisma.courseFileTaskSubmission.findMany({
       where: {
         assignmentId: assignment.id,
-        status: "COMPLETED",
       },
       include: {
         template: { select: { id: true, title: true, description: true } },
@@ -228,40 +255,53 @@ export const getSubjectReviewableTasks = async (req, res) => {
           },
         },
       },
-      orderBy: { deadline: "asc" },
+      orderBy: [
+        { deadline: "asc" },
+        { id: "asc" } 
+      ],
     });
 
     // Enrich with review metadata
-    const enrichedTasks = tasks.map((task) => ({
-      id: task.id,
-      taskId: task.id,
-      template: task.template,
-      deadline: task.deadline,
-      status: task.status,
-      completedAt: task.completedAt,
+    const enrichedTasks = tasks.map((task) => {
+      const isCompleted = task.status === "COMPLETED";
+      
+      return {
+        id: task.id,
+        taskId: task.id,
+        template: task.template,
+        deadline: task.deadline,
+        status: task.status,
+        completedAt: task.completedAt,
 
-      // Review status
-      ccReviewed: task.ccStatus !== "PENDING",
-      ccStatus: task.ccStatus,
-      ccRemarks: task.ccRemarks,
-      ccReviewDate: task.ccReviewDate,
+        // Faculty completion status
+        pendingFacultyAction: !isCompleted,
+        
+        // Review status
+        ccReviewed: task.ccStatus !== "PENDING",
+        ccStatus: task.ccStatus,
+        ccRemarks: task.ccRemarks,
+        ccReviewDate: task.ccReviewDate,
 
-      hodReviewed: task.hodStatus !== "PENDING",
-      hodStatus: task.hodStatus,
-      hodRemarks: task.hodRemarks,
-      hodReviewDate: task.hodReviewDate,
+        hodReviewed: task.hodStatus !== "PENDING",
+        hodStatus: task.hodStatus,
+        hodRemarks: task.hodRemarks,
+        hodReviewDate: task.hodReviewDate,
 
-      // For current reviewer
-      requiresCCReview: task.ccStatus === "PENDING" && role === "CC",
-      requiresHodReview:
-        task.ccStatus !== "PENDING" &&
-        task.hodStatus === "PENDING" &&
-        role === "HOD",
-      isReviewable:
-        role === "CC"
-          ? task.ccStatus === "PENDING"
-          : task.ccStatus !== "PENDING" && task.hodStatus === "PENDING",
-    }));
+        // For current reviewer
+        requiresCCReview: isCompleted && task.ccStatus === "PENDING" && role === "CC",
+        requiresHodReview:
+          isCompleted &&
+          task.ccStatus === "YES" &&
+          task.hodStatus === "PENDING" &&
+          role === "HOD",
+        isReviewable:
+          isCompleted && (
+            role === "CC"
+              ? task.ccStatus === "PENDING"
+              : task.ccStatus === "YES" && task.hodStatus === "PENDING"
+          ),
+      };
+    });
 
     res.status(200).json({
       assignment: {
@@ -340,6 +380,7 @@ export const completeTask = async (req, res) => {
       action: "TASK_COMPLETED",
       message: `Faculty marked task "${updatedTask.template.title}" as COMPLETED`,
       user: { id: req.user.id, name: req.user.name },
+      assignmentId: updatedTask.assignmentId,
       className: updatedTask.assignment.class.name,
       subjectName: updatedTask.assignment.subject.name,
       taskTitle: updatedTask.template.title,
@@ -464,6 +505,7 @@ export const reviewTask = async (req, res) => {
       action: actionType,
       message: `${reviewerRole} reviewed task "${updatedTask.template.title}" as ${status}`,
       user: { id: req.user.id, name: req.user.name },
+      assignmentId: updatedTask.assignmentId,
       className: updatedTask.assignment.class.name,
       subjectName: updatedTask.assignment.subject.name,
       taskTitle: updatedTask.template.title,

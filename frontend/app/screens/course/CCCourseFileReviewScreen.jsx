@@ -18,6 +18,8 @@ import { COLORS, SPACING } from "../../constants/theme";
 import {
   getCCReviewableTasks,
   reviewCourseFileTask,
+  getCourseFileLogs,
+  clearCourseFileLogs,
 } from "../../services/courseFileApi";
 
 const CCCourseFileReviewScreen = () => {
@@ -29,6 +31,9 @@ const CCCourseFileReviewScreen = () => {
   const [reviewingTask, setReviewingTask] = useState(null);
   const [remarks, setRemarks] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsModalVisible, setLogsModalVisible] = useState(false);
 
   useEffect(() => {
     fetchTasks();
@@ -45,6 +50,46 @@ const CCCourseFileReviewScreen = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchLogs = async () => {
+    setLogsLoading(true);
+    try {
+      const data = await getCourseFileLogs(assignmentId);
+      setLogs(data);
+      setLogsModalVisible(true);
+    } catch (error) {
+      Alert.alert("Error", "Failed to fetch logs");
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  const handleClearLogs = async () => {
+    Alert.alert(
+      "Clear Logs",
+      "Are you sure you want to clear all logs for this assignment?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLogsLoading(true);
+              await clearCourseFileLogs(assignmentId);
+              Alert.alert("Success", "Logs cleared successfully");
+              setLogs([]);
+              setLogsModalVisible(false);
+            } catch (error) {
+              Alert.alert("Error", "Failed to clear logs");
+            } finally {
+              setLogsLoading(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleReview = (task, action) => {
@@ -121,13 +166,13 @@ const CCCourseFileReviewScreen = () => {
         </View>
 
         {task.ccReviewed && (
-          <View style={styles.reviewedBadge}>
+          <View style={[styles.reviewedBadge, task.ccStatus === 'NO' && { borderLeftColor: COLORS.error }]}>
             <Ionicons
-              name="checkmark-circle"
+              name={task.ccStatus === "YES" ? "checkmark-circle" : "close-circle"}
               size={16}
-              color={COLORS.success}
+              color={task.ccStatus === "YES" ? COLORS.success : COLORS.error}
             />
-            <AppText variant="small" style={styles.reviewedText}>
+            <AppText variant="small" style={[styles.reviewedText, task.ccStatus === 'NO' && { color: COLORS.error }]}>
               You {task.ccStatus === "YES" ? "approved" : "rejected"} this on{" "}
               {new Date(task.ccReviewDate).toLocaleDateString()}
             </AppText>
@@ -270,6 +315,83 @@ const CCCourseFileReviewScreen = () => {
           </View>
         </View>
       </Modal>
+      {/* Logs Modal */}
+      <Modal visible={logsModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+            <View style={styles.modalHeader}>
+              <AppText variant="h3">Course File Logs</AppText>
+              <TouchableOpacity onPress={() => setLogsModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ flex: 1, paddingHorizontal: SPACING.l }}>
+              {logsLoading ? (
+                <ActivityIndicator
+                  size="large"
+                  color={COLORS.primary}
+                  style={{ marginVertical: 50 }}
+                />
+              ) : logs && logs.length > 0 ? (
+                <View style={{ paddingVertical: SPACING.l }}>
+                  {logs.map((log, index) => (
+                    <View key={index} style={styles.logItem}>
+                      <View style={styles.logTimeline}>
+                        <View style={styles.logDot} />
+                        {index !== logs.length - 1 && (
+                          <View style={styles.logLine} />
+                        )}
+                      </View>
+                      <View style={styles.logContent}>
+                        <AppText style={styles.logTitle}>{log.action}</AppText>
+                        <AppText variant="small" style={styles.logUser}>
+                          {log.userName}
+                        </AppText>
+                        <AppText variant="caption" style={styles.logDate}>
+                          {new Date(log.createdAt).toLocaleString()}
+                        </AppText>
+                        {log.remarks && (
+                          <AppText variant="caption" style={styles.logRemarks}>
+                            Remarks: {log.remarks}
+                          </AppText>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View
+                  style={{ paddingVertical: SPACING.l, alignItems: "center" }}
+                >
+                  <AppText
+                    variant="caption"
+                    style={{ color: COLORS.textSecondary }}
+                  >
+                    No logs available
+                  </AppText>
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.cancelBtn]}
+                onPress={() => setLogsModalVisible(false)}
+              >
+                <AppText style={styles.cancelBtnText}>Close</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.rejectModalBtn]}
+                onPress={handleClearLogs}
+                disabled={logsLoading}
+              >
+                <AppText style={styles.submitBtnText}>Clear Logs</AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenWrapper>
   );
 };
@@ -284,18 +406,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  headerContent: {
+  headerTitle: {
     marginLeft: SPACING.m,
     flex: 1,
+    fontSize: 18,
+    fontWeight: "700",
   },
-  faculty: {
-    color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
-  },
-  subject: {
-    color: COLORS.primary,
-    fontWeight: "500",
-    marginTop: SPACING.xs,
+  logsButton: {
+    padding: SPACING.s,
+    borderRadius: 8,
+    backgroundColor: COLORS.surfaceLight,
   },
   content: {
     flex: 1,
@@ -316,6 +436,11 @@ const styles = StyleSheet.create({
     padding: SPACING.m,
     marginBottom: SPACING.m,
     borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   taskHeader: {
     marginBottom: SPACING.m,
@@ -428,6 +553,7 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: "row",
     gap: SPACING.m,
+    paddingHorizontal: SPACING.l,
   },
   modalBtn: {
     flex: 1,
@@ -451,6 +577,55 @@ const styles = StyleSheet.create({
   submitBtnText: {
     color: COLORS.white,
     fontWeight: "600",
+  },
+  // Log Item Styles
+  logItem: {
+    flexDirection: "row",
+    marginBottom: SPACING.l,
+  },
+  logTimeline: {
+    alignItems: "center",
+    marginRight: SPACING.m,
+    width: 20,
+  },
+  logDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.primary,
+    marginTop: 5,
+  },
+  logLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: COLORS.border,
+    marginTop: 5,
+  },
+  logContent: {
+    flex: 1,
+    paddingBottom: SPACING.s,
+  },
+  logTitle: {
+    fontWeight: "700",
+    fontSize: 14,
+    color: COLORS.textPrimary,
+  },
+  logUser: {
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  logDate: {
+    color: COLORS.textLight,
+    marginTop: 2,
+  },
+  logRemarks: {
+    marginTop: SPACING.xs,
+    color: COLORS.textSecondary,
+    fontStyle: "italic",
+    backgroundColor: COLORS.surfaceLight,
+    padding: SPACING.s,
+    borderRadius: 4,
   },
 });
 

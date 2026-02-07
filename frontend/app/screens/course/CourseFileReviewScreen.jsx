@@ -32,6 +32,8 @@ const CourseFileReviewScreen = () => {
     const [selectedTask, setSelectedTask] = useState(null);
     const [newDeadline, setNewDeadline] = useState('');
 
+    const [searchQuery, setSearchQuery] = useState("");
+
     useEffect(() => {
         fetchData();
         fetchProfile();
@@ -72,6 +74,10 @@ const CourseFileReviewScreen = () => {
             setLoading(false);
         }
     };
+
+    const filteredTasks = tasks.filter(task => 
+        task.template.title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     const handleAction = async (taskId, status) => {
         // Use saved remarks from the task
@@ -175,13 +181,13 @@ const CourseFileReviewScreen = () => {
         <ScreenWrapper backgroundColor={COLORS.surfaceLight} withPadding={false}>
             {/* Header */}
             <View style={styles.header}>
-                <View style={{flexDirection:'row', alignItems:'center'}}>
+                <View style={{flexDirection:'row', alignItems:'center', flex: 1}}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                         <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
                     </TouchableOpacity>
-                    <View>
+                    <View style={{flex: 1}}>
                         <AppText variant="caption" style={styles.eyebrow}>Reviewing Course File</AppText>
-                        <AppText variant="h3" style={styles.headerTitle}>{assignmentDetails.faculty || 'Faculty'} - {assignmentDetails.subject || 'Subject'}</AppText>
+                        <AppText variant="h3" style={styles.headerTitle} numberOfLines={1}>{assignmentDetails.faculty || 'Faculty'} - {assignmentDetails.subject || 'Subject'}</AppText>
                     </View>
                 </View>
                 
@@ -194,13 +200,32 @@ const CourseFileReviewScreen = () => {
                 )}
             </View>
 
+            {/* Search Bar Container */}
+            <View style={styles.searchBarWrapper}>
+                <View style={styles.searchContainer}>
+                    <Ionicons name="search" size={18} color={COLORS.textLight} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search tasks..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholderTextColor={COLORS.textLight}
+                    />
+                    {searchQuery !== "" && (
+                        <TouchableOpacity onPress={() => setSearchQuery("")}>
+                            <Ionicons name="close-circle" size={16} color={COLORS.textLight} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+            </View>
+
             {loading ? (
                 <View style={{flex:1, justifyContent:'center', alignItems:'center'}}>
                     <ActivityIndicator size="large" color={COLORS.primary} />
                 </View>
             ) : (
                 <ScrollView contentContainerStyle={styles.scrollContent}>
-                    {tasks.length > 0 ? tasks.map((item) => {
+                    {filteredTasks.length > 0 ? filteredTasks.map((item) => {
                         const isCompleted = item.status === 'COMPLETED';
                         const ccApproved = item.ccStatus === 'YES';
                         const ccRejected = item.ccStatus === 'NO';
@@ -282,36 +307,70 @@ const CourseFileReviewScreen = () => {
                                         </View>
 
                                         {/* Action Section */}
-                                        <View style={styles.actionSection}>
-                                            <AppText variant="caption" style={{marginBottom: 8, marginTop: 12, fontWeight: '600'}}>Your Review:</AppText>
-                                            
-                                            <View style={styles.actionButtonsRow}>
-                                                <TouchableOpacity 
-                                                    style={[styles.actionBtn, styles.btnApprove]}
-                                                    onPress={() => handleAction(item.id, 'YES')}
-                                                >
-                                                    <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.success} />
-                                                    <AppText variant="small" style={styles.btnTextSuccess}>Approve</AppText>
-                                                </TouchableOpacity>
+                                        {item.isReviewable ? (
+                                            <View style={styles.actionSection}>
+                                                <AppText variant="caption" style={{marginBottom: 8, marginTop: 12, fontWeight: '600'}}>Your Review:</AppText>
+                                                
+                                                <View style={styles.actionButtonsRow}>
+                                                    <TouchableOpacity 
+                                                        style={[styles.actionBtn, styles.btnApprove, item.processing && {opacity: 0.7}]}
+                                                        onPress={() => handleAction(item.id, 'YES')}
+                                                        disabled={item.processing}
+                                                    >
+                                                        {item.processing ? (
+                                                            <ActivityIndicator size="small" color={COLORS.success} />
+                                                        ) : (
+                                                            <>
+                                                                <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.success} />
+                                                                <AppText variant="small" style={styles.btnTextSuccess}>Approve</AppText>
+                                                            </>
+                                                        )}
+                                                    </TouchableOpacity>
 
-                                                <TouchableOpacity 
-                                                    style={[styles.actionBtn, styles.btnReject]}
-                                                    onPress={() => handleAction(item.id, 'NO')}
-                                                >
-                                                    <Ionicons name="close-circle-outline" size={20} color={COLORS.error} />
-                                                    <AppText variant="small" style={styles.btnTextError}>Return</AppText>
+                                                    <TouchableOpacity 
+                                                        style={[styles.actionBtn, styles.btnReject, item.processing && {opacity: 0.7}]}
+                                                        onPress={() => handleAction(item.id, 'NO')}
+                                                        disabled={item.processing}
+                                                    >
+                                                        {item.processing ? (
+                                                            <ActivityIndicator size="small" color={COLORS.error} />
+                                                        ) : (
+                                                            <>
+                                                                <Ionicons name="close-circle-outline" size={20} color={COLORS.error} />
+                                                                <AppText variant="small" style={styles.btnTextError}>Return</AppText>
+                                                            </>
+                                                        )}
+                                                    </TouchableOpacity>
+                                                </View>
+
+                                                {/* Add Remark Button */}
+                                                <TouchableOpacity style={styles.addRemarkBtn} onPress={() => openRemarkModal(item)}>
+                                                    <Ionicons name="create-outline" size={16} color={COLORS.primary} />
+                                                    <AppText style={{color: COLORS.primary, marginLeft: 6}}>
+                                                        {(userRole === 'CC' ? item.ccRemarks : item.hodRemarks) ? 'Edit Remarks' : 'Add Remarks'}
+                                                    </AppText>
                                                 </TouchableOpacity>
                                             </View>
-
-                                            {/* Add Remark Button */}
-                                            <TouchableOpacity style={styles.addRemarkBtn} onPress={() => openRemarkModal(item)}>
-                                                <Ionicons name="create-outline" size={16} color={COLORS.primary} />
-                                                <AppText style={{color: COLORS.primary, marginLeft: 6}}>
-                                                    {(userRole === 'CC' ? item.ccRemarks : item.hodRemarks) ? 'Edit Remarks' : 'Add Remarks'}
-                                                </AppText>
-                                            </TouchableOpacity>
-
-                                        </View>
+                                        ) : (
+                                            <View style={{marginTop: 12, padding: 12, backgroundColor: COLORS.surfaceLight, borderRadius: 8}}>
+                                                {userRole === 'HOD' && item.ccStatus === 'PENDING' ? (
+                                                    <AppText variant="caption" style={{color: COLORS.warning, fontStyle: 'italic'}}>
+                                                        ⌛ Waiting for Class Coordinator verification...
+                                                    </AppText>
+                                                ) : (ccApproved || hodApproved) ? (
+                                                    <View style={{flexDirection:'row', alignItems:'center'}}>
+                                                        <Ionicons name="checkmark-done" size={14} color={COLORS.success} />
+                                                        <AppText variant="caption" style={{color: COLORS.success, marginLeft: 4, fontWeight:'600'}}>
+                                                            You have processed this task.
+                                                        </AppText>
+                                                    </View>
+                                                ) : (
+                                                    <AppText variant="caption" style={{color: COLORS.textLight, fontStyle: 'italic'}}>
+                                                        This task is currently not reviewable by you.
+                                                    </AppText>
+                                                )}
+                                            </View>
+                                        )}
                                     </View>
                                 ) : (
                                     <View style={styles.pendingMessage}>
@@ -426,6 +485,30 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         color: COLORS.textPrimary,
+    },
+    searchBarWrapper: {
+        backgroundColor: COLORS.white,
+        paddingHorizontal: SPACING.l,
+        paddingBottom: SPACING.m,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.surfaceLight,
+        paddingHorizontal: SPACING.m,
+        paddingVertical: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    searchInput: {
+        flex: 1,
+        marginLeft: SPACING.s,
+        fontSize: 14,
+        color: COLORS.textPrimary,
+        padding: 0,
     },
     batchBtn: {
         flexDirection: 'row',

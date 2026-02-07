@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity, FlatList, RefreshControl } from 'react-native';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
@@ -8,7 +7,7 @@ import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
 import { wp, hp } from '../../utils/responsive';
-import { getMyProfile, getMyCourseAssignments } from '../../services/api';
+import { getMyProfile, getMyCourseAssignments, getCourseTasks } from '../../services/api';
 
 const FacultyDashboard = () => {
     const router = useRouter();
@@ -20,10 +19,6 @@ const FacultyDashboard = () => {
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
 
-    // Placeholder for activities until API is ready
-    const ACTIVITIES = [
-        { id: '1', title: 'Lecture Feedback Generated', description: 'Class 5A - Data Structures', time: '1 hour ago', type: 'success' },
-    ];
 
     useEffect(() => {
         fetchProfile();
@@ -33,15 +28,22 @@ const FacultyDashboard = () => {
 
     const fetchMyTasks = async () => {
         try {
-             // We need an API for this. getCourseTasks returns all tasks.
-             // We will filter pending.
-             const { getCourseTasks } = require('../../services/api');
              const tasks = await getCourseTasks();
-             const pending = tasks.filter(t => t.status === 'PENDING')
-                                  .sort((a,b) => new Date(a.deadline) - new Date(b.deadline))
-                                  .slice(0, 5); // Start with top 5
              
-             setUpcomingTasks(pending);
+             // Include PENDING tasks OR tasks that were REJECTED and need revision
+             const pending = tasks.filter(t => 
+                t.status === 'PENDING' || t.ccStatus === 'NO' || t.hodStatus === 'NO'
+             );
+
+             // Sort: Closest deadline first, tasks with NO deadline at the bottom
+             const sorted = pending.sort((a, b) => {
+                 if (!a.deadline && !b.deadline) return 0;
+                 if (!a.deadline) return 1;
+                 if (!b.deadline) return -1;
+                 return new Date(a.deadline) - new Date(b.deadline);
+             });
+             
+             setUpcomingTasks(sorted.slice(0, 5));
         } catch (e) {
             console.log("Error fetching tasks", e);
         }
@@ -117,85 +119,38 @@ const FacultyDashboard = () => {
                         <AppText variant="h2" style={styles.userName}>{user?.name || name || 'Faculty'}.</AppText>
                     </View>
                     <TouchableOpacity onPress={() => router.push('/profile')}>
-                        <Image 
-                            source="https://randomuser.me/api/portraits/women/44.jpg" 
-                            style={styles.profileImage}
-                            contentFit="cover"
-                        />
+                        <Ionicons name="person-circle" size={50} color={COLORS.primary} />
                     </TouchableOpacity>
                 </View>
 
 
-                <View style={[styles.section, { paddingHorizontal: SPACING.l, marginTop: SPACING.m }]}>
-                    <TouchableOpacity 
-                        style={[styles.taskCard, { backgroundColor: '#10B98120', borderColor: '#10B981', marginHorizontal: 0 }]}
-                        onPress={() => router.push('/feedback/monitoring')}
-                    >
-                        <View style={{flexDirection:'row', alignItems:'center', gap: 12}}>
-                            <View style={{padding:8, backgroundColor: '#10B981', borderRadius:8}}>
-                                <Ionicons name="stats-chart" size={24} color={COLORS.white} />
-                            </View>
-                            <View>
-                                <AppText style={{fontSize:16, fontWeight:'600'}}>Feedback Reports</AppText>
-                                <AppText variant="caption" style={{color: COLORS.textSecondary}}>View results of your feedback sessions</AppText>
-                            </View>
-                            <View style={{flex:1, alignItems:'flex-end'}}>
-                                <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
-                            </View>
-                        </View>
-                    </TouchableOpacity>
-                </View>
 
                 {/* Course File Compliance Section */}
                 <View style={styles.section}>
-                    <AppText variant="h3" style={styles.sectionTitle}>Course File Status</AppText>
-                    {courseAssignments.length > 0 ? (
-                        courseAssignments.map(assign => {
-                            const total = assign?.progress?.total || 0;
-                            const completed = assign?.progress?.completed || 0;
-                            const percent = total > 0 ? (completed / total) * 100 : 0;
-                            const isComplianceRisk = percent < 50; // Simple logic
-
-                            return (
-                                <TouchableOpacity 
-                                    key={assign.id} 
-                                    style={styles.taskCard}
-                                    onPress={() => router.push(`/course-checklist?assignmentId=${assign.id}`)}
-                                >
-                                    <View style={{flexDirection:'row', justifyContent:'space-between', marginBottom: 8}}>
-                                        <AppText style={{fontWeight:'600'}}>{assign.subject.name}</AppText>
-                                        <AppText style={{color: COLORS.textSecondary}}>{assign.class.name}</AppText>
-                                    </View>
-                                    
-                                    <View style={{height: 6, backgroundColor: COLORS.surface, borderRadius: 3, marginVertical: 8, overflow:'hidden'}}>
-                                        <View style={{height:'100%', width: `${percent}%`, backgroundColor: isComplianceRisk ? COLORS.warning : COLORS.success}} />
-                                    </View>
-
-                                    <View style={{flexDirection:'row', justifyContent:'space-between'}}>
-                                        <AppText variant="caption" style={{color: isComplianceRisk ? COLORS.warning : COLORS.success}}>
-                                            {completed}/{total} Tasks Completed
-                                        </AppText>
-                                        <AppText variant="caption" style={{color: COLORS.textLight}}>
-                                            {Math.round(percent)}%
-                                        </AppText>
-                                    </View>
-                                </TouchableOpacity>
-                            );
-                        })
-                    ) : (
-                        <View style={{paddingHorizontal: SPACING.l}}>
-                            <AppText style={{color: COLORS.textSecondary, fontStyle: 'italic'}}>No course files assigned.</AppText>
-                        </View>
-                    )}
+                    <View style={{paddingHorizontal: SPACING.l, marginBottom: SPACING.m}}>
+                        <AppText variant="h3">Course File Status</AppText>
+                    </View>
+                    <TouchableOpacity 
+                        style={[styles.taskCard, {borderColor: COLORS.success}]}
+                        onPress={() => router.push('/my-course-files')}
+                    >
+                         <View style={{flexDirection:'row', alignItems:'center', gap: 12}}>
+                             <View style={{padding:8, backgroundColor: COLORS.success+'20', borderRadius:8}}>
+                                <Ionicons name="folder-open" size={24} color={COLORS.success} />
+                             </View>
+                             <View style={{flex: 1}}>
+                                 <AppText style={{fontSize:16, fontWeight:'600'}}>My Subject Course Files</AppText>
+                                 <AppText variant="caption" style={{color: COLORS.textSecondary}}>Manage submissions and track compliance</AppText>
+                             </View>
+                             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+                         </View>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Assessments Section */}
-                <View style={[styles.section, {paddingHorizontal: SPACING.l}]}>
-                     <View style={{flexDirection:'row', justifyContent:'space-between', marginBottom: SPACING.m}}>
+                <View style={styles.section}>
+                    <View style={{paddingHorizontal: SPACING.l, marginBottom: SPACING.m}}>
                         <AppText variant="h3">Assessments</AppText>
-                        <TouchableOpacity onPress={() => router.push('/assessments')}>
-                            <AppText style={{color: COLORS.primary}}>View All</AppText>
-                        </TouchableOpacity>
                     </View>
                     <TouchableOpacity 
                         style={[styles.taskCard, {borderColor: COLORS.primary}]}
@@ -205,13 +160,33 @@ const FacultyDashboard = () => {
                              <View style={{padding:8, backgroundColor: COLORS.primary+'20', borderRadius:8}}>
                                 <Ionicons name="clipboard" size={24} color={COLORS.primary} />
                              </View>
-                             <View>
+                             <View style={{flex: 1}}>
                                  <AppText style={{fontSize:16, fontWeight:'600'}}>Review & Add Marks</AppText>
                                  <AppText variant="caption" style={{color: COLORS.textSecondary}}>Manage IA, CSE, and ESE marks</AppText>
                              </View>
-                             <View style={{flex:1, alignItems:'flex-end'}}>
-                                 <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+                             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+                         </View>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Feedback Section */}
+                <View style={styles.section}>
+                    <View style={{paddingHorizontal: SPACING.l, marginBottom: SPACING.m}}>
+                        <AppText variant="h3">Feedback Analysis</AppText>
+                    </View>
+                    <TouchableOpacity 
+                        style={[styles.taskCard, {borderColor: '#10B981'}]}
+                        onPress={() => router.push('/feedback/monitoring')}
+                    >
+                         <View style={{flexDirection:'row', alignItems:'center', gap: 12}}>
+                             <View style={{padding:8, backgroundColor: '#10B98120', borderRadius:8}}>
+                                <Ionicons name="stats-chart" size={24} color="#10B981" />
                              </View>
+                             <View style={{flex: 1}}>
+                                 <AppText style={{fontSize:16, fontWeight:'600'}}>Feedback Reports</AppText>
+                                 <AppText variant="caption" style={{color: COLORS.textSecondary}}>View results of your feedback sessions</AppText>
+                             </View>
+                             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
                          </View>
                     </TouchableOpacity>
                 </View>
@@ -232,14 +207,23 @@ const FacultyDashboard = () => {
                                         styles.taskTitle,
                                         { color: isUrgent ? COLORS.error : COLORS.warning }
                                     ]}>
-                                        {task.template && task.template.title ? task.template.title : "Task"}
+                                        {task.template?.title || "Task"}
+                                    </AppText>
+                                    <AppText variant="caption" style={{color: COLORS.textSecondary}}>
+                                        {task.assignment?.subject?.name} • {task.assignment?.class?.name}
                                     </AppText>
                                 </View>
                                 <View style={styles.taskFooter}>
                                     <AppText variant="caption" style={styles.taskDate}>
-                                        Due: {new Date(task.deadline).toLocaleDateString('en-US', {month:'short', day:'numeric'})}
+                                        {task.deadline 
+                                            ? `Due: ${new Date(task.deadline).toLocaleDateString('en-US', {month:'short', day:'numeric'})}`
+                                            : "No Deadline Set"
+                                        }
                                     </AppText>
-                                    <TouchableOpacity style={styles.actionButton}>
+                                    <TouchableOpacity 
+                                        style={styles.actionButton}
+                                        onPress={() => router.push(`/course-checklist?assignmentId=${task.assignmentId}`)}
+                                    >
                                         <AppText variant="caption" style={styles.actionButtonText}>
                                             {isUrgent ? 'Action Required' : 'View Details'}
                                         </AppText>
@@ -254,27 +238,6 @@ const FacultyDashboard = () => {
                     )}
                 </View>
 
-                {/* Recent Activity Section */}
-                <View style={[styles.section, styles.lastSection]}>
-                    <AppText variant="h3" style={styles.sectionTitle}>Recent Activity</AppText>
-                    {ACTIVITIES.map(activity => (
-                        <View key={activity.id} style={styles.activityCard}>
-                            <View style={styles.activityContent}>
-                                <View style={[styles.statusDot, { backgroundColor: COLORS.success }]} />
-                                <View style={styles.activityTextContainer}>
-                                    <AppText style={styles.activityTitle}>{activity.title}</AppText>
-                                    <AppText variant="caption" style={styles.activityDesc}>{activity.description}</AppText>
-                                </View>
-                            </View>
-                            <View style={styles.activityFooter}>
-                                <AppText variant="caption" style={styles.timeText}>{activity.time}</AppText>
-                                <TouchableOpacity style={styles.viewReportButton}>
-                                     <AppText variant="caption" style={styles.viewReportText}>View Report</AppText>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    ))}
-                </View>
 
             </ScrollView>
 
@@ -319,7 +282,7 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.gray,
     },
     section: {
-        marginBottom: SPACING.xl,
+        marginBottom: SPACING.s,
     },
     sectionTitle: {
         paddingHorizontal: SPACING.l,
@@ -407,55 +370,6 @@ const styles = StyleSheet.create({
     actionButtonText: {
         fontWeight: '600',
         color: COLORS.textPrimary,
-    },
-    activityCard: {
-        backgroundColor: COLORS.white,
-        marginHorizontal: SPACING.l,
-        padding: SPACING.m,
-        borderRadius: LAYOUT.radius.m,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        elevation: 2,
-    },
-    activityContent: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: SPACING.s,
-    },
-    activityTextContainer: {
-        flex: 1,
-    },
-    activityTitle: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: COLORS.textPrimary,
-        marginBottom: 2,
-    },
-    activityDesc: {
-        color: COLORS.textSecondary,
-    },
-    activityFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingLeft: SPACING.m + 4,
-        marginTop: SPACING.xs,
-    },
-    timeText: {
-        color: COLORS.textLight,
-    },
-    viewReportButton: {
-        backgroundColor: COLORS.surface,
-        paddingHorizontal: SPACING.m,
-        paddingVertical: SPACING.xs,
-        borderRadius: LAYOUT.radius.s,
-    },
-    viewReportText: {
-        fontWeight: '600',
-        color: COLORS.textPrimary,
-    },
-    lastSection: {
-        marginBottom: SPACING.xxl,
     },
     fab: {
         position: 'absolute',

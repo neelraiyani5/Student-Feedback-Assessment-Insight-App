@@ -73,12 +73,13 @@ const ChecklistScreen = () => {
                     text: "Confirm", 
                     onPress: async () => {
                         try {
-                            // Optimistic update
-                            setTasks(current => current.map(t => t.id === taskId ? { ...t, status: 'COMPLETED' } : t));
+                            setTasks(current => current.map(t => t.id === taskId ? { ...t, processing: true } : t));
                             await completeCourseTask(taskId);
+                            Alert.alert("Success", "Task submitted successfully");
+                            fetchTasks();
                         } catch (error) {
                             Alert.alert("Error", "Failed to update task status");
-                            fetchTasks(); // Revert
+                            setTasks(current => current.map(t => t.id === taskId ? { ...t, processing: false } : t));
                         }
                     } 
                 }
@@ -127,7 +128,16 @@ const ChecklistScreen = () => {
                         const isCompleted = task.status === 'COMPLETED';
 
                         return (
-                            <View key={task.id} style={styles.taskCard}>
+                            <View key={task.id} style={[styles.taskCard, isRejected && { borderLeftColor: COLORS.error, borderLeftWidth: 4 }]}>
+                                {isRejected && (
+                                    <View style={styles.returnedBanner}>
+                                        <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+                                        <AppText variant="small" style={{ color: COLORS.error, marginLeft: 4, fontWeight: '700' }}>
+                                            RETURNED FOR REVISION
+                                        </AppText>
+                                    </View>
+                                )}
+                                
                                 {/* Task Title Row */}
                                 <View style={styles.taskRow}>
                                     <View style={{flex: 1, marginRight: SPACING.s}}>
@@ -144,30 +154,49 @@ const ChecklistScreen = () => {
                                         )}
                                     </View>
                                     
-                                    <Switch
-                                        trackColor={{ false: COLORS.inputBorder, true: isRejected ? COLORS.warning : COLORS.success }}
-                                        thumbColor={COLORS.white}
-                                        ios_backgroundColor={COLORS.inputBorder}
-                                        onValueChange={() => handleTaskCompletion(task.id, task.status, task.ccStatus, task.hodStatus)}
-                                        value={isCompleted}
-                                        disabled={isCompleted && !isRejected} 
-                                        style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                                    />
+                                    {task.processing ? (
+                                        <ActivityIndicator size="small" color={COLORS.primary} />
+                                    ) : !isRejected && (
+                                        <Switch
+                                            trackColor={{ false: COLORS.inputBorder, true: COLORS.success }}
+                                            thumbColor={COLORS.white}
+                                            ios_backgroundColor={COLORS.inputBorder}
+                                            onValueChange={() => handleTaskCompletion(task.id, task.status, task.ccStatus, task.hodStatus)}
+                                            value={isCompleted}
+                                            disabled={isCompleted} 
+                                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                                        />
+                                    )}
                                 </View>
 
                                 {/* Task Details Row (Status/Action) */}
                                 <View style={styles.taskFooter}>
-                                    {isCompleted ? (
-                                        <View style={[styles.statusBadgeCompleted, isRejected && {backgroundColor: '#FFFBEB'}]}>
+                                    {isCompleted && !isRejected ? (
+                                        <View style={styles.statusBadgeCompleted}>
                                             <Ionicons 
-                                                name={isRejected ? "alert-circle" : "checkmark-circle"} 
+                                                name="checkmark-circle" 
                                                 size={14} 
-                                                color={isRejected ? COLORS.warning : COLORS.success} 
+                                                color={COLORS.success} 
                                             />
-                                            <AppText variant="small" style={[styles.statusTextCompleted, isRejected && {color: COLORS.warning}]}>
-                                                {isRejected ? 'Action Required' : 'Completed'}
+                                            <AppText variant="small" style={styles.statusTextCompleted}>
+                                                Submitted
                                             </AppText>
                                         </View>
+                                    ) : isRejected ? (
+                                        <TouchableOpacity 
+                                            style={[styles.resubmitBtn, task.processing && { opacity: 0.7 }]}
+                                            onPress={() => !task.processing && handleTaskCompletion(task.id, task.status, task.ccStatus, task.hodStatus)}
+                                            disabled={task.processing}
+                                        >
+                                            {task.processing ? (
+                                                <ActivityIndicator size="small" color={COLORS.white} />
+                                            ) : (
+                                                <>
+                                                    <Ionicons name="reload" size={14} color={COLORS.white} />
+                                                    <AppText variant="small" style={styles.resubmitText}>Mark as Resolve & Re-submit</AppText>
+                                                </>
+                                            )}
+                                        </TouchableOpacity>
                                     ) : (
                                         <View style={styles.actionsContainer}>
                                             {task.deadline ? (
@@ -217,9 +246,10 @@ const ChecklistScreen = () => {
                                         )}
                                         
                                         {(task.ccRemarks || task.hodRemarks) && (
-                                            <View style={{width: '100%', marginTop: 4, padding: 4, backgroundColor: '#FEF2F2', borderRadius: 4}}>
-                                                <AppText variant="caption" style={{color: COLORS.error, fontStyle: 'italic'}}>
-                                                    Remarks: "{task.ccRemarks || task.hodRemarks}"
+                                            <View style={{width: '100%', marginTop: 4, padding: 8, backgroundColor: '#FEF2F2', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: COLORS.error}}>
+                                                <AppText variant="caption" style={{color: COLORS.textPrimary, fontWeight: '600'}}>Remarks:</AppText>
+                                                <AppText variant="caption" style={{color: COLORS.error, fontStyle: 'italic', marginTop: 2}}>
+                                                    "{task.ccRemarks || task.hodRemarks}"
                                                 </AppText>
                                             </View>
                                         )}
@@ -344,6 +374,27 @@ const styles = StyleSheet.create({
     },
     dueDateText: {
         color: COLORS.error,
+        fontWeight: '600',
+    },
+    returnedBanner: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#FEF2F2",
+        padding: 6,
+        borderRadius: 4,
+        marginBottom: SPACING.s,
+    },
+    resubmitBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: SPACING.m,
+        paddingVertical: 6,
+        borderRadius: 4,
+        gap: 6
+    },
+    resubmitText: {
+        color: COLORS.white,
         fontWeight: '600',
     }
 });

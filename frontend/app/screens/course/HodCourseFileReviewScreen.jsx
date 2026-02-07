@@ -45,7 +45,9 @@ const HodCourseFileReviewScreen = () => {
   const [logsModalVisible, setLogsModalVisible] = useState(false);
   const [logs, setLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [selectedLogAssignmentId, setSelectedLogAssignmentId] = useState(null);
   const [subjectAssignment, setSubjectAssignment] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Handle hardware back button
   useFocusEffect(
@@ -176,6 +178,7 @@ const HodCourseFileReviewScreen = () => {
   };
 
   const handleBack = () => {
+    setSearchQuery(""); // Clear search on back
     if (subjectId) {
       // Coming from subject details - just go back
       router.back();
@@ -188,14 +191,21 @@ const HodCourseFileReviewScreen = () => {
     }
   };
 
+  const filteredTasks = tasks.filter((task) =>
+    task.template.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
   const fetchLogs = async (assignmentId) => {
+    setSelectedLogAssignmentId(assignmentId);
     setLogsLoading(true);
+    setLogsModalVisible(true);
     try {
       const data = await getCourseFileLogs(assignmentId);
       setLogs(data);
-      setLogsModalVisible(true);
     } catch (error) {
+      console.log("Error fetching logs:", error);
       Alert.alert("Error", "Failed to fetch logs");
+      setLogsModalVisible(false);
     } finally {
       setLogsLoading(false);
     }
@@ -229,20 +239,25 @@ const HodCourseFileReviewScreen = () => {
   };
 
   const TaskCard = ({ task }) => {
-    const ccReviewed = task.ccStatus !== null;
-    const hodCanReview = ccReviewed && !task.hodReviewed;
-    const hodAlreadyReviewed = task.hodReviewed;
+    const isCompleted = task.status === "COMPLETED";
+    const ccVerified = task.ccStatus === "YES";
+    const ccRejected = task.ccStatus === "NO";
+    const hodAlreadyReviewed =
+      task.hodStatus === "YES" || task.hodStatus === "NO";
+    const canReview = task.isReviewable;
 
     return (
       <View
         style={[
           styles.taskCard,
           {
-            borderLeftColor: hodCanReview
+            borderLeftColor: canReview
               ? COLORS.warning
               : hodAlreadyReviewed
                 ? COLORS.success
-                : COLORS.info,
+                : isCompleted || ccVerified
+                  ? COLORS.info
+                  : COLORS.border,
             borderLeftWidth: 4,
           },
         ]}
@@ -256,46 +271,69 @@ const HodCourseFileReviewScreen = () => {
           </View>
         </View>
 
+        {/* Status Indicators */}
+        <View style={styles.metaRow}>
+          <View
+            style={[
+              styles.miniBadge,
+              { backgroundColor: isCompleted ? COLORS.success : COLORS.border },
+            ]}
+          >
+            <AppText variant="small" style={{ color: COLORS.white }}>
+              {isCompleted ? "Submitted" : "Pending Submission"}
+            </AppText>
+          </View>
+        </View>
+
         {/* CC Review Status */}
-        {ccReviewed ? (
-          <View style={styles.reviewSection}>
-            <AppText variant="small" style={styles.sectionTitle}>
-              CC Review
+        <View style={styles.reviewSection}>
+          <AppText variant="small" style={styles.sectionTitle}>
+            CC Review
+          </AppText>
+          <View style={styles.reviewRow}>
+            <Ionicons
+              name={
+                ccVerified
+                  ? "checkmark-circle"
+                  : ccRejected
+                    ? "close-circle"
+                    : "hourglass"
+              }
+              size={16}
+              color={
+                ccVerified
+                  ? COLORS.success
+                  : ccRejected
+                    ? COLORS.error
+                    : COLORS.warning
+              }
+            />
+            <AppText
+              variant="small"
+              style={[
+                styles.reviewStatus,
+                {
+                  color: ccVerified
+                    ? COLORS.success
+                    : ccRejected
+                      ? COLORS.error
+                      : COLORS.warning,
+                },
+              ]}
+            >
+              {ccVerified
+                ? "Verified"
+                : ccRejected
+                  ? "Rejected"
+                  : "Pending CC Review"}
             </AppText>
-            <View style={styles.reviewRow}>
-              <Ionicons
-                name={
-                  task.ccStatus === "YES" ? "checkmark-circle" : "close-circle"
-                }
-                size={16}
-                color={task.ccStatus === "YES" ? COLORS.success : COLORS.error}
-              />
-              <AppText variant="small" style={styles.reviewStatus}>
-                {task.ccStatus === "YES" ? "Approved" : "Rejected"}
+            {task.ccRemarks && (
+              <AppText variant="caption" style={styles.remarks}>
+                📝 {task.ccRemarks}
               </AppText>
-              {task.ccRemarks && (
-                <AppText variant="caption" style={styles.remarks}>
-                  📝 {task.ccRemarks}
-                </AppText>
-              )}
-            </View>
+            )}
           </View>
-        ) : (
-          <View style={styles.reviewSection}>
-            <AppText variant="small" style={styles.sectionTitle}>
-              CC Review
-            </AppText>
-            <View style={styles.reviewRow}>
-              <Ionicons name="hourglass" size={16} color={COLORS.warning} />
-              <AppText
-                variant="small"
-                style={[styles.reviewStatus, { color: COLORS.warning }]}
-              >
-                Pending CC Review
-              </AppText>
-            </View>
-          </View>
-        )}
+        </View>
 
         {/* HOD Review Status */}
         {hodAlreadyReviewed && (
@@ -323,41 +361,71 @@ const HodCourseFileReviewScreen = () => {
           </View>
         )}
 
-        {/* Approve/Reject Buttons - Show after CC review or if already reviewed */}
-        {ccReviewed && (
+        {/* Approve/Reject Buttons */}
+        {(canReview || hodAlreadyReviewed) && (
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={[
                 styles.btn,
                 styles.approveBtn,
-                hodAlreadyReviewed && { opacity: 0.6 },
+                !canReview && { opacity: 0.6 },
               ]}
               onPress={() => handleReview(task, "YES")}
-              disabled={false}
+              disabled={!canReview}
             >
               <Ionicons name="checkmark" size={16} color={COLORS.white} />
-              <AppText style={styles.btnText}>Approve</AppText>
+              <AppText style={styles.btnText}>
+                {hodAlreadyReviewed ? "Edit Approval" : "Approve"}
+              </AppText>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.btn,
                 styles.rejectBtn,
-                hodAlreadyReviewed && { opacity: 0.6 },
+                !canReview && { opacity: 0.6 },
               ]}
               onPress={() => handleReview(task, "NO")}
-              disabled={false}
+              disabled={!canReview}
             >
               <Ionicons name="close" size={16} color={COLORS.white} />
-              <AppText style={styles.btnText}>Reject</AppText>
+              <AppText style={styles.btnText}>
+                {hodAlreadyReviewed ? "Edit Rejection" : "Reject"}
+              </AppText>
             </TouchableOpacity>
           </View>
+        )}
+
+        {!isCompleted && (
+          <AppText
+            variant="caption"
+            style={{
+              marginTop: 12,
+              fontStyle: "italic",
+              color: COLORS.textSecondary,
+            }}
+          >
+            Cannot review until faculty submits
+          </AppText>
+        )}
+
+        {isCompleted && !ccVerified && !ccRejected && (
+          <AppText
+            variant="caption"
+            style={{
+              marginTop: 12,
+              fontStyle: "italic",
+              color: COLORS.warning,
+            }}
+          >
+            Waiting for Class Coordinator to verify
+          </AppText>
         )}
       </View>
     );
   };
 
   return (
-    <ScreenWrapper backgroundColor={COLORS.surfaceLight} withPadding={false}>
+    <ScreenWrapper backgroundColor="#F1F5F9" withPadding={false}>
       <View style={styles.header}>
         <TouchableOpacity
           onPress={handleBack}
@@ -377,6 +445,36 @@ const HodCourseFileReviewScreen = () => {
           </AppText>
         </View>
       </View>
+      
+      {loading && step === "semester" ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
+            Loading Course Files...
+          </AppText>
+        </View>
+      ) : (
+        <>
+          {/* Task Step Search Bar */}
+          {step === "tasks" && !loading && (
+        <View style={styles.searchWrapper}>
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={18} color={COLORS.textLight} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor={COLORS.textLight}
+            />
+            {searchQuery !== "" && (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <Ionicons name="close-circle" size={16} color={COLORS.textLight} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
 
       <ScrollView style={styles.content}>
         {/* Step 1: Semesters */}
@@ -389,31 +487,70 @@ const HodCourseFileReviewScreen = () => {
                   {compliance.departmentName}
                 </AppText>
 
-                <View style={styles.statRow}>
+                <View style={[styles.statRow, { justifyContent: 'space-between', paddingHorizontal: SPACING.s }]}>
+                  {/* Activity Ring 1: Faculty Submission */}
                   <View style={styles.statItem}>
-                    <AppText variant="small" style={styles.statLabel}>
-                      Completion
-                    </AppText>
-                    <AppText style={styles.statValue}>
-                      {compliance.completedTasks.percent}%
+                    <View style={styles.miniGaugeContainer}>
+                      <View style={[styles.miniGaugeOuter, { borderColor: 'rgba(255,255,255,0.2)' }]} />
+                      <View 
+                        style={[
+                          styles.miniGaugeProgress, 
+                          { 
+                            borderColor: COLORS.white,
+                            transform: [{ rotate: `${(compliance.completedTasks.percent / 100) * 360 - 45}deg` }]
+                          }
+                        ]} 
+                      />
+                      <AppText variant="small" style={{ color: COLORS.white, fontWeight: '700' }}>
+                        {compliance.completedTasks.percent}%
+                      </AppText>
+                    </View>
+                    <AppText variant="caption" style={[styles.statLabel, { marginTop: 8, fontSize: 10 }]}>
+                      Submitted
                     </AppText>
                   </View>
-                  <View style={styles.statDivider} />
+
+                  {/* Activity Ring 2: CC Review */}
                   <View style={styles.statItem}>
-                    <AppText variant="small" style={styles.statLabel}>
-                      CC Reviewed
-                    </AppText>
-                    <AppText style={styles.statValue}>
-                      {compliance.ccReviewedTasks.percent}%
+                    <View style={styles.miniGaugeContainer}>
+                      <View style={[styles.miniGaugeOuter, { borderColor: 'rgba(255,255,255,0.2)' }]} />
+                      <View 
+                        style={[
+                          styles.miniGaugeProgress, 
+                          { 
+                            borderColor: COLORS.white,
+                            transform: [{ rotate: `${(compliance.ccReviewedTasks.percent / 100) * 360 - 45}deg` }]
+                          }
+                        ]} 
+                      />
+                      <AppText variant="small" style={{ color: COLORS.white, fontWeight: '700' }}>
+                        {compliance.ccReviewedTasks.percent}%
+                      </AppText>
+                    </View>
+                    <AppText variant="caption" style={[styles.statLabel, { marginTop: 8, fontSize: 10 }]}>
+                      CC Verified
                     </AppText>
                   </View>
-                  <View style={styles.statDivider} />
+
+                  {/* Activity Ring 3: HOD Review */}
                   <View style={styles.statItem}>
-                    <AppText variant="small" style={styles.statLabel}>
-                      Your Review
-                    </AppText>
-                    <AppText style={styles.statValue}>
-                      {compliance.hodReviewedTasks.percent}%
+                    <View style={styles.miniGaugeContainer}>
+                      <View style={[styles.miniGaugeOuter, { borderColor: 'rgba(255,255,255,0.2)' }]} />
+                      <View 
+                        style={[
+                          styles.miniGaugeProgress, 
+                          { 
+                            borderColor: COLORS.white,
+                            transform: [{ rotate: `${(compliance.hodReviewedTasks.percent / 100) * 360 - 45}deg` }]
+                          }
+                        ]} 
+                      />
+                      <AppText variant="small" style={{ color: COLORS.white, fontWeight: '700' }}>
+                        {compliance.hodReviewedTasks.percent}%
+                      </AppText>
+                    </View>
+                    <AppText variant="caption" style={[styles.statLabel, { marginTop: 8, fontSize: 10 }]}>
+                      HOD Approved
                     </AppText>
                   </View>
                 </View>
@@ -551,18 +688,31 @@ const HodCourseFileReviewScreen = () => {
         {/* Step 3: Tasks */}
         {step === "tasks" && (
           <>
-            <View style={styles.assignmentHeader}>
-              <AppText variant="h3" style={styles.sectionTitle}>
-                {subjectAssignment?.faculty || selectedAssignment?.facultyName}
-              </AppText>
-              <AppText variant="caption" style={styles.subjectInfo}>
-                {subjectAssignment?.className || selectedAssignment?.className}
-              </AppText>
-              {subjectAssignment && (
-                <AppText variant="caption" style={styles.subjectInfo}>
-                  Subject: {subjectAssignment?.subject}
+            <View style={[styles.assignmentHeader, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+              <View style={{ flex: 1 }}>
+                <AppText variant="h3" style={styles.sectionTitle}>
+                  {subjectAssignment?.faculty || selectedAssignment?.facultyName}
                 </AppText>
-              )}
+                <AppText variant="caption" style={styles.subjectInfo}>
+                  {subjectAssignment?.className || selectedAssignment?.className}
+                </AppText>
+                {subjectAssignment && (
+                  <AppText variant="caption" style={styles.subjectInfo}>
+                    Subject: {subjectAssignment?.subject}
+                  </AppText>
+                )}
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.logsIconButton}
+                onPress={() => {
+                  const aid = subjectAssignment?.id || selectedAssignment?.assignmentId;
+                  if (aid) fetchLogs(aid);
+                }}
+              >
+                <Ionicons name="time-outline" size={24} color={COLORS.primary} />
+                <AppText variant="small" style={{ color: COLORS.primary, fontWeight: '600', marginTop: 2 }}>History</AppText>
+              </TouchableOpacity>
             </View>
 
             {loading ? (
@@ -580,8 +730,15 @@ const HodCourseFileReviewScreen = () => {
                 />
                 <AppText style={styles.emptyText}>All tasks reviewed!</AppText>
               </View>
+            ) : filteredTasks.length === 0 ? (
+              <View style={[styles.emptyState, { marginTop: 40 }]}>
+                <Ionicons name="search" size={48} color={COLORS.textLight} />
+                <AppText style={{ marginTop: 12, color: COLORS.textSecondary }}>
+                  No tasks matching "{searchQuery}"
+                </AppText>
+              </View>
             ) : (
-              tasks.map((task) => <TaskCard key={task.id} task={task} />)
+              filteredTasks.map((task) => <TaskCard key={task.id} task={task} />)
             )}
           </>
         )}
@@ -652,10 +809,9 @@ const HodCourseFileReviewScreen = () => {
         </View>
       </Modal>
 
-      {/* Logs Modal */}
       <Modal visible={logsModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+          <View style={[styles.modalContent, { height: "70%" }]}>
             <View style={styles.modalHeader}>
               <AppText variant="h3">Course File Logs</AppText>
               <TouchableOpacity onPress={() => setLogsModalVisible(false)}>
@@ -665,15 +821,13 @@ const HodCourseFileReviewScreen = () => {
 
             <ScrollView style={{ flex: 1, paddingHorizontal: SPACING.l }}>
               {logsLoading ? (
-                <ActivityIndicator
-                  size="large"
-                  color={COLORS.primary}
-                  style={{ marginVertical: 50 }}
-                />
+                <View style={{ paddingVertical: 50 }}>
+                  <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
               ) : logs && logs.length > 0 ? (
-                <View style={{ paddingVertical: SPACING.l }}>
+                <View style={{ paddingBottom: SPACING.l }}>
                   {logs.map((log, index) => (
-                    <View key={index} style={styles.logItem}>
+                    <View key={log.id || index} style={styles.logItem}>
                       <View style={styles.logTimeline}>
                         <View style={styles.logDot} />
                         {index !== logs.length - 1 && (
@@ -681,16 +835,16 @@ const HodCourseFileReviewScreen = () => {
                         )}
                       </View>
                       <View style={styles.logContent}>
-                        <AppText style={styles.logTitle}>{log.action}</AppText>
+                        <AppText style={styles.logTitle}>{log.message || log.action}</AppText>
                         <AppText variant="small" style={styles.logUser}>
-                          {log.createdBy}
+                          By: {log.userName || "System"}
                         </AppText>
                         <AppText variant="caption" style={styles.logDate}>
                           {new Date(log.createdAt).toLocaleString()}
                         </AppText>
-                        {log.remarks && (
+                        {log.metadata && log.metadata.remarks && (
                           <AppText variant="caption" style={styles.logRemarks}>
-                            Remarks: {log.remarks}
+                            Remarks: {log.metadata.remarks}
                           </AppText>
                         )}
                       </View>
@@ -699,19 +853,19 @@ const HodCourseFileReviewScreen = () => {
                 </View>
               ) : (
                 <View
-                  style={{ paddingVertical: SPACING.l, alignItems: "center" }}
+                  style={{ paddingVertical: 50, alignItems: "center" }}
                 >
+                  <Ionicons name="receipt-outline" size={48} color={COLORS.border} />
                   <AppText
-                    variant="caption"
-                    style={{ color: COLORS.textSecondary }}
+                    style={{ color: COLORS.textSecondary, marginTop: 12 }}
                   >
-                    No logs available
+                    No activity recorded yet.
                   </AppText>
                 </View>
               )}
             </ScrollView>
 
-            <View style={styles.modalButtons}>
+            <View style={[styles.modalButtons, { paddingHorizontal: SPACING.l, paddingVertical: SPACING.m }]}>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.cancelBtn]}
                 onPress={() => setLogsModalVisible(false)}
@@ -720,9 +874,7 @@ const HodCourseFileReviewScreen = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.rejectModalBtn]}
-                onPress={() =>
-                  handleClearLogs(selectedAssignment?.assignmentId)
-                }
+                onPress={() => handleClearLogs(selectedLogAssignmentId)}
                 disabled={logsLoading}
               >
                 <AppText style={styles.submitBtnText}>Clear Logs</AppText>
@@ -731,7 +883,15 @@ const HodCourseFileReviewScreen = () => {
           </View>
         </View>
       </Modal>
-    </ScreenWrapper>
+      
+      {loading && step !== "semester" && (
+        <View style={styles.centeredLoader}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      )}
+    </>
+  )}
+</ScreenWrapper>
   );
 };
 
@@ -752,6 +912,30 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: SPACING.l,
+  },
+  searchWrapper: {
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: SPACING.l,
+    paddingBottom: SPACING.m,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.surfaceLight,
+    paddingHorizontal: SPACING.m,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: SPACING.s,
+    fontSize: 14,
+    color: COLORS.textPrimary,
+    padding: 0,
   },
   complianceCard: {
     backgroundColor: COLORS.primary,
@@ -785,6 +969,28 @@ const styles = StyleSheet.create({
     width: 1,
     height: 40,
     backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  miniGaugeContainer: {
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  miniGaugeOuter: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 4,
+  },
+  miniGaugeProgress: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 4,
+    borderTopColor: 'transparent',
+    borderRightColor: 'transparent',
   },
   sectionTitle: {
     marginBottom: SPACING.m,
@@ -879,6 +1085,15 @@ const styles = StyleSheet.create({
   },
   taskDesc: {
     color: COLORS.textSecondary,
+  },
+  metaRow: {
+    flexDirection: "row",
+    marginBottom: 12,
+  },
+  miniBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   reviewSection: {
     backgroundColor: COLORS.surfaceLight,
@@ -1043,6 +1258,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginBottom: SPACING.xs,
+  },
+  logsIconButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.s,
+    backgroundColor: COLORS.primary + '10',
+    borderRadius: 8,
+    minWidth: 60,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  centeredLoader: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(241, 245, 249, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
   },
 });
 
