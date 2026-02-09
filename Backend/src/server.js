@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import multer from "multer";
 
 import connectDB from "./config/db.js";
 import adminRoutes from "./routes/adminRoutes.js";
@@ -28,6 +29,7 @@ connectDB();
 // Enable CORS for all origins (needed for React Native/Expo)
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.use("/user", adminRoutes);
 app.use("/auth", authRoutes);
@@ -44,6 +46,15 @@ app.use("/course-file-assignment", courseFileAssignmentRoutes);
 app.use("/course-file-submission", courseFileSubmissionRoutes);
 app.use("/course-file-log", courseFileLogRoutes);
 app.use("/hod-course-file", hodCourseFileRoutes);
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ message: "Multer Error: " + err.message });
+  }
+  res.status(500).json({ message: err.message || "Internal Server Error" });
+});
 
 app.listen(port, () => {
   console.log(`Server running on "http://localhost:${port}"`);
