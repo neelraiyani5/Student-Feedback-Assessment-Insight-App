@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   FlatList,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -43,12 +44,14 @@ const ManageCurriculumScreen = () => {
   const [classModalVisible, setClassModalVisible] = useState(false);
   const [editClassModalVisible, setEditClassModalVisible] = useState(false);
   const [ccModalVisible, setCcModalVisible] = useState(false);
+  const [stage, setStage] = useState("semester"); // 'semester' | 'class'
 
   // Forms
   const [deptName, setDeptName] = useState("");
   const [semNumber, setSemNumber] = useState("");
   const [className, setClassName] = useState("");
   const [selectedSemId, setSelectedSemId] = useState(null);
+  const [selectedSemester, setSelectedSemester] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
 
   // CC Logic
@@ -58,8 +61,8 @@ const ManageCurriculumScreen = () => {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (isRefreshingCall = false) => {
+    if (!isRefreshingCall && !department) setLoading(true);
     try {
       const userData = await getMyProfile();
       setUser(userData.user);
@@ -71,6 +74,12 @@ const ManageCurriculumScreen = () => {
         const deptId = userData.user.hodDepartments[0].id;
         const deptData = await getDepartmentOverview(deptId);
         setDepartment(deptData);
+        
+        // If we are in class stage, update the selected semester data
+        if (stage === 'class' && selectedSemId) {
+            const updatedSem = deptData.semesters.find(s => s.id === selectedSemId);
+            if (updatedSem) setSelectedSemester(updatedSem);
+        }
       } else {
         console.log("No department found for HOD");
       }
@@ -220,29 +229,66 @@ const ManageCurriculumScreen = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <ScreenWrapper>
-        <ActivityIndicator
-          size="large"
-          color={COLORS.primary}
-          style={{ marginTop: 50 }}
-        />
-      </ScreenWrapper>
-    );
+  const goBack = () => {
+    if (stage === "class") {
+        setStage("semester");
+        setSelectedSemester(null);
+        setSelectedSemId(null);
+    } else {
+        router.back();
+    }
   }
 
+  const handleSelectSemester = (sem) => {
+    setSelectedSemester(sem);
+    setSelectedSemId(sem.id);
+    setStage("class");
+  };
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    fetchData(true);
+  }, [department, stage]);
+
+
   return (
-    <ScreenWrapper backgroundColor={COLORS.surfaceLight}>
+    <ScreenWrapper backgroundColor="#F1F5F9" withPadding={false}>
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
+          onPress={goBack}
         >
-          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+          <Ionicons
+            name={stage === "semester" ? "arrow-back" : "chevron-back"}
+            size={24}
+            color={COLORS.primary}
+          />
         </TouchableOpacity>
-        <AppText variant="h3">Semester Management</AppText>
-        {!department && (
+        <View style={styles.headerContent}>
+            <AppText variant="h3">
+                {stage === 'semester' ? 'Semester Management' : `Semester ${selectedSemester?.sem}`}
+            </AppText>
+            {stage === 'class' && (
+                <AppText variant="caption" color={COLORS.textSecondary}>Class Management</AppText>
+            )}
+        </View>
+
+        {!loading && department && stage === 'semester' && (
+          <TouchableOpacity
+            onPress={() => setSemModalVisible(true)}
+          >
+            <Ionicons name="add-circle-outline" size={28} color={COLORS.primary} />
+          </TouchableOpacity>
+        )}
+        
+        {!loading && stage === 'class' && (
+             <TouchableOpacity
+             onPress={() => openAddClass(selectedSemId)}
+           >
+             <Ionicons name="add-circle" size={28} color={COLORS.primary} />
+           </TouchableOpacity>
+        )}
+
+        {!loading && !department && (
           <TouchableOpacity
             onPress={() => setDeptModalVisible(true)}
             style={styles.addButton}
@@ -250,18 +296,19 @@ const ManageCurriculumScreen = () => {
             <AppText style={styles.addButtonText}>Create Dept</AppText>
           </TouchableOpacity>
         )}
-        {department && (
-          <TouchableOpacity
-            onPress={() => setSemModalVisible(true)}
-            style={styles.iconButton}
-          >
-            <Ionicons name="add-circle" size={28} color={COLORS.primary} />
-          </TouchableOpacity>
-        )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {!department ? (
+      <ScrollView 
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} color={COLORS.primary} />
+        }
+      >
+        {loading && !department ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+        ) : !department ? (
           <View style={styles.emptyContainer}>
             <AppText style={styles.emptyText}>
               You haven't created a department yet.
@@ -279,37 +326,38 @@ const ManageCurriculumScreen = () => {
               {department.name}
             </AppText>
 
-            {department.semesters
-              ?.sort((a, b) => a.sem - b.sem)
-              .map((sem) => (
-                <View key={sem.id} style={styles.semCard}>
-                  <View style={styles.semHeader}>
-                    <AppText variant="h3">Semester {sem.sem}</AppText>
-                    <View style={{ flexDirection: "row", gap: SPACING.s }}>
-                      <TouchableOpacity
-                        onPress={() => openAddClass(sem.id)}
-                        style={styles.addClassBtn}
-                      >
-                        <Ionicons name="add" size={16} color={COLORS.white} />
-                        <AppText style={styles.addClassText}>Class</AppText>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => handleDeleteSemester(sem.id)}
-                        style={[
-                          styles.addClassBtn,
-                          { backgroundColor: COLORS.error },
-                        ]}
-                      >
-                        <Ionicons name="trash" size={16} color={COLORS.white} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <View style={styles.classesContainer}>
-                    {sem.classes?.length === 0 && (
-                      <AppText style={styles.noData}>No classes</AppText>
+            {stage === 'semester' ? (
+                <FlatList 
+                    data={department.semesters?.sort((a, b) => a.sem - b.sem)}
+                    keyExtractor={item => item.id}
+                    scrollEnabled={false}
+                    renderItem={({ item: sem }) => (
+                        <TouchableOpacity 
+                            style={styles.semItem}
+                            onPress={() => handleSelectSemester(sem)}
+                        >
+                            <View>
+                                <AppText style={styles.semTitle}>Semester {sem.sem}</AppText>
+                                <AppText variant="caption" style={{color: COLORS.textSecondary}}>{sem.classes?.length || 0} classes</AppText>
+                            </View>
+                            <View style={{flexDirection:'row', alignItems:'center', gap: 12}}>
+                                <TouchableOpacity onPress={() => handleDeleteSemester(sem.id)}>
+                                    <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+                                </TouchableOpacity>
+                                <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+                            </View>
+                        </TouchableOpacity>
                     )}
-                    {sem.classes?.map((cls) => (
+                />
+            ) : (
+                <View style={styles.classesGrid}>
+                    {selectedSemester?.classes?.length === 0 && (
+                        <View style={styles.emptyCentered}>
+                            <Ionicons name="people-outline" size={48} color={COLORS.textLight} />
+                            <AppText style={styles.noData}>No classes created yet</AppText>
+                        </View>
+                    )}
+                    {selectedSemester?.classes?.map((cls) => (
                       <View key={cls.id} style={styles.classCard}>
                         <View
                           style={{
@@ -319,7 +367,7 @@ const ManageCurriculumScreen = () => {
                           }}
                         >
                           <TouchableOpacity
-                            onPress={() => openEditClass(cls, sem.id)}
+                            onPress={() => openEditClass(cls, selectedSemId)}
                             style={{ flex: 1 }}
                           >
                             <AppText style={styles.className}>
@@ -376,12 +424,17 @@ const ManageCurriculumScreen = () => {
                         </View>
                       </View>
                     ))}
-                  </View>
                 </View>
-              ))}
+            )}
           </View>
         )}
       </ScrollView>
+
+      {loading && department && (
+        <View style={styles.centeredLoader}>
+           <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      )}
 
       {/* Create Department Modal */}
       <Modal visible={deptModalVisible} transparent animationType="slide">
@@ -577,15 +630,36 @@ const ManageCurriculumScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    paddingVertical: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centeredLoader: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(241, 245, 249, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: SPACING.m,
+    paddingHorizontal: SPACING.l,
     paddingVertical: SPACING.m,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    gap: SPACING.m,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  backButton: {
+    padding: SPACING.xs,
   },
   content: {
-    padding: SPACING.m,
+    padding: SPACING.l,
     paddingBottom: 50,
   },
   addButton: {
@@ -600,8 +674,36 @@ const styles = StyleSheet.create({
   },
   deptTitle: {
     textAlign: "center",
-    marginBottom: SPACING.l,
+    marginBottom: SPACING.m,
     color: COLORS.primary,
+    fontWeight: 'bold',
+  },
+  semItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    padding: SPACING.m,
+    borderRadius: LAYOUT.radius.m,
+    marginBottom: SPACING.s,
+    elevation: 1,
+  },
+  semTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  classesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  emptyCentered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 100,
+    width: '100%',
   },
   semCard: {
     backgroundColor: COLORS.white,

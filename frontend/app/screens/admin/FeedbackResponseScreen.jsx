@@ -6,7 +6,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
-import { getSessionResponses } from '../../services/api';
+import { getSessionResponses, getMyProfile } from '../../services/api';
 
 const FeedbackResponseScreen = () => {
     const router = useRouter();
@@ -14,39 +14,26 @@ const FeedbackResponseScreen = () => {
     const [loading, setLoading] = useState(true);
     const [responses, setResponses] = useState([]);
     const [stats, setStats] = useState([]);
+    const [userRole, setUserRole] = useState(null);
+    const [showIndividual, setShowIndividual] = useState(false);
+    const [total, setTotal] = useState(0);
 
     useEffect(() => {
         fetchData();
     }, [id]);
 
-    const calculateStats = (data) => {
-        if (!data || data.length === 0) return [];
-        
-        const questionMap = {};
-        
-        data.forEach(resp => {
-            if (resp.answers && Array.isArray(resp.answers)) {
-                resp.answers.forEach(ans => {
-                    if (!questionMap[ans.question]) {
-                        questionMap[ans.question] = {};
-                    }
-                    questionMap[ans.question][ans.answer] = (questionMap[ans.question][ans.answer] || 0) + 1;
-                });
-            }
-        });
+    // Role fetching logic moved to fetchData for performance
 
-        return Object.keys(questionMap).map(qText => ({
-            question: qText,
-            options: questionMap[qText]
-        }));
-    };
+    // We now receive stats pre-calculated from backend
 
     const fetchData = async () => {
         setLoading(true);
         try {
             const data = await getSessionResponses(id);
-            setResponses(data || []);
-            setStats(calculateStats(data || []));
+            setResponses(data.responses || []);
+            setStats(data.stats || []);
+            setTotal(data.total || 0);
+            setUserRole(data.requesterRole);
         } catch (error) {
             console.log("Error fetching responses", error);
         } finally {
@@ -96,14 +83,14 @@ const FeedbackResponseScreen = () => {
             </View>
 
             <View style={styles.summaryBar}>
-                <AppText style={{fontWeight:'600', color: COLORS.textSecondary}}>Total Responses: {responses.length}</AppText>
+                <AppText style={{fontWeight:'600', color: COLORS.textSecondary}}>Total Responses: {total}</AppText>
             </View>
 
             {loading ? (
                 <ActivityIndicator size="large" color={COLORS.primary} style={{marginTop: 50}} />
             ) : (
                 <FlatList 
-                    data={responses}
+                    data={userRole === 'HOD' && showIndividual ? responses : []}
                     renderItem={renderItem}
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.listContent}
@@ -115,7 +102,7 @@ const FeedbackResponseScreen = () => {
                                     <View key={idx} style={styles.statCard}>
                                         <AppText style={styles.statQuestion}>{s.question}</AppText>
                                         {Object.entries(s.options).map(([opt, count], iidx) => {
-                                            const percent = Math.round((count / responses.length) * 100);
+                                            const percent = total > 0 ? Math.round((count / total) * 100) : 0;
                                             return (
                                                 <View key={iidx} style={styles.barRow}>
                                                     <View style={{flexDirection:'row', justifyContent:'space-between', marginBottom: 4}}>
@@ -131,14 +118,27 @@ const FeedbackResponseScreen = () => {
                                     </View>
                                 ))}
                                 <View style={styles.divider} />
-                                <AppText variant="h3" style={styles.statsHeader}>Individual Responses</AppText>
+                                {userRole === 'HOD' && !showIndividual && (
+                                    <TouchableOpacity 
+                                        style={styles.showButton} 
+                                        onPress={() => setShowIndividual(true)}
+                                    >
+                                        <Ionicons name="eye-outline" size={20} color={COLORS.primary} />
+                                        <AppText style={styles.showButtonText}>View Individual Responses</AppText>
+                                    </TouchableOpacity>
+                                )}
+                                {(userRole === 'HOD' && showIndividual) && (
+                                    <AppText variant="h3" style={styles.statsHeader}>Individual Responses</AppText>
+                                )}
                             </View>
                         )
                     }
                     ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <AppText style={styles.emptyText}>No responses yet.</AppText>
-                        </View>
+                        total === 0 ? (
+                            <View style={styles.emptyContainer}>
+                                <AppText style={styles.emptyText}>No responses yet.</AppText>
+                            </View>
+                        ) : null
                     }
                 />
             )}
@@ -255,6 +255,22 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: COLORS.border,
         marginVertical: 20
+    },
+    showButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: COLORS.surface,
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: COLORS.primary + '30',
+        marginBottom: 20
+    },
+    showButtonText: {
+        marginLeft: 8,
+        color: COLORS.primary,
+        fontWeight: '600'
     }
 });
 

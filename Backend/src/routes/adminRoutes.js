@@ -31,6 +31,6 @@ router.get('/list', auth, role("HOD", "CC"), getUsers);
 
 router.patch('/update/:id', auth, role("HOD", "CC"), updateUser);
 
-router.post('/bulk-upload', auth, role("HOD"), upload.single("file"), bulkUploadValidation, validate, bulkUploadUsers);
+router.post('/bulk-upload', auth, role("HOD", "CC"), upload.single("file"), bulkUploadValidation, validate, bulkUploadUsers);
 
 export default router;

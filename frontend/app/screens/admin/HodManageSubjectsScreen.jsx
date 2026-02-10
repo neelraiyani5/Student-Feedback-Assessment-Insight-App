@@ -245,48 +245,52 @@ const HodManageSubjectsScreen = () => {
     }
   };
 
-  if (loading && stage === "semester") {
-    return (
-      <ScreenWrapper backgroundColor={COLORS.surfaceLight}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </ScreenWrapper>
-    );
-  }
 
   return (
-    <ScreenWrapper backgroundColor={COLORS.surfaceLight} withPadding={false}>
+    <ScreenWrapper backgroundColor="#F1F5F9" withPadding={false}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={goBack}
-          style={stage !== "semester" && styles.backButton}
         >
-          {stage !== "semester" && (
-            <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
-          )}
+          <Ionicons
+            name={stage === "semester" ? "arrow-back" : "chevron-back"}
+            size={24}
+            color={COLORS.primary}
+          />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <AppText variant="h2" style={styles.headerTitle}>
-            {stage === "semester" && "Select Semester"}
-            {stage === "class" && "Select Class"}
-            {stage === "manage" && "Manage Subjects"}
+        <View style={styles.headerContent}>
+          <AppText variant="h3">
+                {stage === 'semester' ? 'Subject Management' : 
+                 stage === 'class' ? 'Select Class' : 'Manage Subjects'}
           </AppText>
           {stage === "class" && selectedSemester && (
-            <AppText variant="body2" color={COLORS.textSecondary}>
+            <AppText variant="caption" color={COLORS.textSecondary}>
               Semester {selectedSemester.sem}
             </AppText>
           )}
           {stage === "manage" && selectedClass && (
-            <AppText variant="body2" color={COLORS.textSecondary}>
-              {selectedClass.name} - Semester {selectedSemester?.sem}
+            <AppText variant="caption" color={COLORS.textSecondary}>
+              {selectedClass.name} • Sem {selectedSemester?.sem}
             </AppText>
           )}
         </View>
+
+        {stage === 'manage' && (
+             <TouchableOpacity
+             onPress={openCreateModal}
+           >
+             <Ionicons name="add-circle-outline" size={28} color={COLORS.primary} />
+           </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* SEMESTER SELECTION STAGE */}
-        {stage === "semester" && (
+        {loading && stage === "semester" ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+        ) : stage === "semester" && (
           <View style={styles.container}>
             {!department || !department.semesters?.length ? (
               <View style={styles.emptyContainer}>
@@ -376,16 +380,10 @@ const HodManageSubjectsScreen = () => {
         {/* MANAGE SUBJECTS STAGE */}
         {stage === "manage" && selectedClass && (
           <View style={styles.container}>
-            <TouchableOpacity
-              style={styles.createButton}
-              onPress={openCreateModal}
-            >
-              <Ionicons name="add-circle" size={24} color={COLORS.white} />
-              <AppText style={styles.createButtonText}>Create Subject</AppText>
-            </TouchableOpacity>
-
             {loading ? (
-              <ActivityIndicator size="large" color={COLORS.primary} />
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+              </View>
             ) : subjects.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons
@@ -569,24 +567,37 @@ const HodManageSubjectsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    paddingVertical: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centeredLoader: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(241, 245, 249, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: SPACING.m,
+    paddingHorizontal: SPACING.l,
     paddingVertical: SPACING.m,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+    gap: SPACING.m,
+  },
+  headerContent: {
+    flex: 1,
   },
   backButton: {
-    marginRight: SPACING.m,
-  },
-  headerTitle: {
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.xs,
+    padding: SPACING.xs,
   },
   scrollContent: {
-    padding: SPACING.m,
+    padding: SPACING.l,
+    paddingBottom: 50,
   },
   container: {
     flex: 1,

@@ -7,7 +7,7 @@ import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
 import { wp, hp } from '../../utils/responsive';
-import { getMyProfile, getMyCourseAssignments, getCourseTasks } from '../../services/api';
+import { getDashboardSummary } from '../../services/api';
 
 const FacultyDashboard = () => {
     const router = useRouter();
@@ -21,64 +21,40 @@ const FacultyDashboard = () => {
 
 
     useEffect(() => {
-        fetchProfile();
-        fetchCourseAssignments();
-        fetchMyTasks();
+        fetchDashboardData();
     }, []);
 
-    const fetchMyTasks = async () => {
+    const fetchDashboardData = async (isRefresh = false) => {
+        if (!isRefresh) setLoading(true);
         try {
-             const tasks = await getCourseTasks();
-             
-             // Include PENDING tasks OR tasks that were REJECTED and need revision
-             const pending = tasks.filter(t => 
-                t.status === 'PENDING' || t.ccStatus === 'NO' || t.hodStatus === 'NO'
-             );
-
-             // Sort: Closest deadline first, tasks with NO deadline at the bottom
-             const sorted = pending.sort((a, b) => {
-                 if (!a.deadline && !b.deadline) return 0;
-                 if (!a.deadline) return 1;
-                 if (!b.deadline) return -1;
-                 return new Date(a.deadline) - new Date(b.deadline);
-             });
-             
-             setUpcomingTasks(sorted.slice(0, 5));
-        } catch (e) {
-            console.log("Error fetching tasks", e);
-        }
-    }
-
-    const fetchProfile = async () => {
-        try {
-            const data = await getMyProfile();
+            const data = await getDashboardSummary();
+            
+            // Set Profile & Subjects
             if (data.user) {
                 setUser(data.user);
                 if (data.user.subjects) {
-                     const formatted = data.user.subjects.map((s, index) => ({
+                    const formatted = data.user.subjects.map((s, index) => ({
                         id: s.id,
                         name: s.name,
                         code: s.name.substring(0, 4).toUpperCase(),
                         icon: 'book',
-                        color: index % 2 === 0 ? '#4F46E5' : '#7C3AED' // Alternating colors
+                        color: index % 2 === 0 ? '#4F46E5' : '#7C3AED'
                     }));
                     setSubjects(formatted);
                 }
             }
-        } catch (error) {
-            console.error("Failed to fetch profile", error);
-        }
-    };
 
-    const fetchCourseAssignments = async () => {
-        setLoading(true);
-        try {
-            const data = await getMyCourseAssignments();
-            setCourseAssignments(data || []);
-        } catch (error) {
-            console.log("Failed to fetch course assignments", error);
+            // Set Assignments
+            setCourseAssignments(data.myAssignments || []);
+
+            // Set Tasks (Already limited/sorted by server)
+            setUpcomingTasks(data.upcomingTasks || []);
+
+        } catch (e) {
+            console.error("Dashboard error", e);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
@@ -96,13 +72,9 @@ const FacultyDashboard = () => {
 
 
 
-    const onRefresh = React.useCallback(async () => {
+    const onRefresh = React.useCallback(() => {
         setRefreshing(true);
-        try {
-           await Promise.all([fetchProfile(), fetchCourseAssignments(), fetchMyTasks()]);
-        } finally {
-           setRefreshing(false);
-        }
+        fetchDashboardData(true);
     }, []);
 
     return (

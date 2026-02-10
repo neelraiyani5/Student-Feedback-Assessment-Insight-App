@@ -19,6 +19,7 @@ import courseFileAssignmentRoutes from "./routes/courseFileAssignmentRoutes.js";
 import courseFileSubmissionRoutes from "./routes/courseFileSubmissionRoutes.js";
 import courseFileLogRoutes from "./routes/courseFileLogRoutes.js";
 import hodCourseFileRoutes from "./routes/hodCourseFileRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
 dotenv.config();
 
 const port = process.env.PORT || 3002;
@@ -46,6 +47,7 @@ app.use("/course-file-assignment", courseFileAssignmentRoutes);
 app.use("/course-file-submission", courseFileSubmissionRoutes);
 app.use("/course-file-log", courseFileLogRoutes);
 app.use("/hod-course-file", hodCourseFileRoutes);
+app.use("/dashboard", dashboardRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

@@ -6,7 +6,7 @@ import { COLORS, FONTS, SPACING, LAYOUT } from "../constants/theme";
 import AppText from "../components/AppText";
 import ScreenWrapper from "../components/ScreenWrapper";
 import { wp, hp } from "../utils/responsive";
-import { getToken, getMyProfile } from "../services/api";
+import { getToken, getMyProfile, getUserInfoFromToken } from "../services/api";
 
 export default function LandingScreen() {
   const router = useRouter();
@@ -16,20 +16,19 @@ export default function LandingScreen() {
   }, []);
 
   const checkLogin = async () => {
-    const token = await getToken();
-    if (token) {
-      try {
-        const { user } = await getMyProfile();
-        if (user.role === 'HOD' || user.role === 'CC') {
+    try {
+      const userInfo = await getUserInfoFromToken();
+      if (userInfo && userInfo.role) {
+        if (userInfo.role === 'HOD' || userInfo.role === 'CC') {
             router.replace('/coordinator-dashboard');
-        } else if (user.role === 'FACULTY') {
+        } else if (userInfo.role === 'FACULTY') {
             router.replace('/faculty-dashboard');
-        } else if (user.role === 'STUDENT') {
+        } else if (userInfo.role === 'STUDENT') {
             router.replace('/student-dashboard');
         }
-      } catch (error) {
-        console.log("Auto login failed", error);
       }
+    } catch (error) {
+      console.log("Quick login check failed", error);
     }
   };
 

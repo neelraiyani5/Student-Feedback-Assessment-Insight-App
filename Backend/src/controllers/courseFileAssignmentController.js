@@ -85,15 +85,32 @@ export const getClassAssignments = async (req, res) => {
             }
         });
 
-        const assignmentsWithProgress = await Promise.all(assignments.map(async (a) => {
-             const completed = await prisma.courseFileTaskSubmission.count({
-                 where: { assignmentId: a.id, status: 'COMPLETED' }
-             });
-             return { ...a, progress: { completed, total: a._count.tasks } };
+        // Optimize: Use groupBy to avoid N+1 queries
+        const assignmentIds = assignments.map(a => a.id);
+        const completedCounts = await prisma.courseFileTaskSubmission.groupBy({
+            by: ['assignmentId'],
+            where: {
+                assignmentId: { in: assignmentIds },
+                status: 'COMPLETED'
+            },
+            _count: { _all: true }
+        });
+
+        const countsMap = Object.fromEntries(
+            completedCounts.map(c => [c.assignmentId, c._count._all])
+        );
+
+        const assignmentsWithProgress = assignments.map(a => ({
+            ...a,
+            progress: {
+                completed: countsMap[a.id] || 0,
+                total: a._count.tasks
+            }
         }));
 
         res.status(200).json(assignmentsWithProgress);
     } catch (error) {
+        console.error("Error fetching class assignments:", error);
         res.status(500).json({ message: "Failed to fetch assignments" });
     }
 };
@@ -140,18 +157,31 @@ export const getMyAssignments = async (req, res) => {
             }
         });
         
-        // Calculate progress manually or use aggregation
-        // We need pending vs completed count
-        
-        const assignmentsWithProgress = await Promise.all(assignments.map(async (a) => {
-             const completed = await prisma.courseFileTaskSubmission.count({
-                 where: { assignmentId: a.id, status: 'COMPLETED' }
-             });
-             return { ...a, progress: { completed, total: a._count.tasks } };
+        const assignmentIds = assignments.map(a => a.id);
+        const completedCounts = await prisma.courseFileTaskSubmission.groupBy({
+            by: ['assignmentId'],
+            where: {
+                assignmentId: { in: assignmentIds },
+                status: 'COMPLETED'
+            },
+            _count: { _all: true }
+        });
+
+        const countsMap = Object.fromEntries(
+            completedCounts.map(c => [c.assignmentId, c._count._all])
+        );
+
+        const assignmentsWithProgress = assignments.map(a => ({
+            ...a,
+            progress: {
+                completed: countsMap[a.id] || 0,
+                total: a._count.tasks
+            }
         }));
 
         res.status(200).json(assignmentsWithProgress);
     } catch (error) {
+        console.error("Error fetching my assignments:", error);
         res.status(500).json({ message: "Failed to fetch my assignments" });
     }
 };
@@ -160,7 +190,6 @@ export const getDepartmentAssignments = async (req, res) => {
     try {
         const hodId = req.user.id;
         
-        // Find departments where user is HOD
         const departments = await prisma.department.findMany({
             where: { hodId },
             select: { id: true }
@@ -184,16 +213,31 @@ export const getDepartmentAssignments = async (req, res) => {
             }
         });
 
-        // Add progress
-         const assignmentsWithProgress = await Promise.all(assignments.map(async (a) => {
-             const completed = await prisma.courseFileTaskSubmission.count({
-                 where: { assignmentId: a.id, status: 'COMPLETED' }
-             });
-             return { ...a, progress: { completed, total: a._count.tasks } };
+        const assignmentIds = assignments.map(a => a.id);
+        const completedCounts = await prisma.courseFileTaskSubmission.groupBy({
+            by: ['assignmentId'],
+            where: {
+                assignmentId: { in: assignmentIds },
+                status: 'COMPLETED'
+            },
+            _count: { _all: true }
+        });
+
+        const countsMap = Object.fromEntries(
+            completedCounts.map(c => [c.assignmentId, c._count._all])
+        );
+
+        const assignmentsWithProgress = assignments.map(a => ({
+            ...a,
+            progress: {
+                completed: countsMap[a.id] || 0,
+                total: a._count.tasks
+            }
         }));
 
         res.status(200).json(assignmentsWithProgress);
     } catch (error) {
+        console.error("Error fetching department assignments:", error);
         res.status(500).json({ message: "Failed to fetch department assignments" });
     }
 };

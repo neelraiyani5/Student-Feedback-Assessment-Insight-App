@@ -7,7 +7,9 @@ import * as Clipboard from 'expo-clipboard';
 import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
-import { getUsers, createUser, deleteUser } from '../../services/api';
+import { getUsers, createUser, deleteUser, bulkUploadFaculty } from '../../services/api';
+import * as DocumentPicker from 'expo-document-picker';
+import { Platform, ScrollView } from 'react-native';
 
 const ManageFacultyScreen = () => {
   const router = useRouter();
@@ -19,6 +21,11 @@ const ManageFacultyScreen = () => {
   
   // Created User Credentials
   const [createdUser, setCreatedUser] = useState(null);
+
+  // Bulk Import State
+  const [importing, setImporting] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
+  const [bulkModalVisible, setBulkModalVisible] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -91,6 +98,46 @@ const ManageFacultyScreen = () => {
       );
   };
 
+  const handleBulkImport = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+          'text/csv'
+        ],
+        copyToCacheDirectory: true
+      });
+
+      if (result.canceled) return;
+
+      const file = result.assets[0];
+      
+      setImporting(true);
+      const formData = new FormData();
+
+      if (Platform.OS === 'web') {
+        formData.append('file', file.file);
+      } else {
+        formData.append('file', {
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+      }
+
+      const response = await bulkUploadFaculty(formData);
+      setBulkResult(response);
+      setBulkModalVisible(true);
+      fetchFaculty();
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', error.message || 'Failed to process bulk upload');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const copyToClipboard = async () => {
       if (createdUser?.password) {
           await Clipboard.setStringAsync(createdUser.password);
@@ -136,9 +183,22 @@ const ManageFacultyScreen = () => {
                 <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
             </TouchableOpacity>
             <AppText variant="h3">Manage Faculty</AppText>
-            <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.addButton}>
-                <Ionicons name="add" size={24} color={COLORS.primary} />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+                <TouchableOpacity 
+                    onPress={handleBulkImport} 
+                    style={[styles.actionButton, { marginRight: SPACING.s }]}
+                    disabled={importing}
+                >
+                    {importing ? (
+                        <ActivityIndicator size="small" color={COLORS.primary} />
+                    ) : (
+                        <Ionicons name="cloud-upload-outline" size={24} color={COLORS.primary} />
+                    )}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.actionButton}>
+                    <Ionicons name="add" size={24} color={COLORS.primary} />
+                </TouchableOpacity>
+            </View>
       </View>
 
       {loading ? (
@@ -253,6 +313,64 @@ const ManageFacultyScreen = () => {
           </View>
       </Modal>
 
+      {/* Bulk Import Result Modal */}
+      <Modal
+        visible={bulkModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setBulkModalVisible(false)}
+      >
+          <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                  <View style={styles.modalHeader}>
+                      <AppText variant="h3">Import Results</AppText>
+                      <TouchableOpacity onPress={() => setBulkModalVisible(false)}>
+                          <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                      </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.resultSummary}>
+                      <View style={styles.summaryItem}>
+                          <AppText style={styles.summaryValue}>{bulkResult?.successCount || 0}</AppText>
+                          <AppText style={styles.summaryLabel}>Success</AppText>
+                      </View>
+                      <View style={[styles.summaryItem, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: COLORS.border }]}>
+                          <AppText style={[styles.summaryValue, { color: COLORS.error }]}>{bulkResult?.failureCount || 0}</AppText>
+                          <AppText style={styles.summaryLabel}>Failed</AppText>
+                      </View>
+                      <View style={styles.summaryItem}>
+                          <AppText style={styles.summaryValue}>{bulkResult?.totalProcessed || 0}</AppText>
+                          <AppText style={styles.summaryLabel}>Total</AppText>
+                      </View>
+                  </View>
+
+                  {bulkResult?.errors?.length > 0 && (
+                      <View style={styles.errorListContainer}>
+                          <AppText style={styles.errorTitle}>Errors ({bulkResult.errors.length})</AppText>
+                          <ScrollView style={styles.errorList} nestedScrollEnabled={true}>
+                              {bulkResult.errors.map((err, idx) => (
+                                  <View key={idx} style={styles.errorItem}>
+                                      <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+                                      <AppText style={styles.errorText}>
+                                          <AppText style={{ fontWeight: 'bold' }}>{err.userid || err.name || 'Row'}: </AppText>
+                                          {err.error}
+                                      </AppText>
+                                  </View>
+                              ))}
+                          </ScrollView>
+                      </View>
+                  )}
+
+                  <TouchableOpacity 
+                      style={[styles.submitButton, { width: '100%', marginTop: SPACING.l }]}
+                      onPress={() => setBulkModalVisible(false)}
+                  >
+                      <AppText style={styles.submitText}>Close</AppText>
+                  </TouchableOpacity>
+              </View>
+          </View>
+      </Modal>
+
     </ScreenWrapper>
   );
 };
@@ -268,7 +386,11 @@ const styles = StyleSheet.create({
   backButton: {
     padding: SPACING.xs,
   },
-  addButton: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionButton: {
       padding: SPACING.xs,
       backgroundColor: COLORS.surface,
       borderRadius: LAYOUT.radius.m,
@@ -416,6 +538,52 @@ const styles = StyleSheet.create({
   },
   copyButton: {
       padding: 4,
+  },
+  resultSummary: {
+      flexDirection: 'row',
+      backgroundColor: COLORS.surface,
+      borderRadius: LAYOUT.radius.m,
+      padding: SPACING.m,
+      marginBottom: SPACING.l,
+  },
+  summaryItem: {
+      flex: 1,
+      alignItems: 'center',
+  },
+  summaryValue: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: COLORS.primary,
+  },
+  summaryLabel: {
+      fontSize: 12,
+      color: COLORS.textSecondary,
+      marginTop: 2,
+  },
+  errorListContainer: {
+      maxHeight: 200,
+  },
+  errorTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: COLORS.textPrimary,
+      marginBottom: SPACING.s,
+  },
+  errorList: {
+      backgroundColor: COLORS.surface,
+      borderRadius: LAYOUT.radius.m,
+      padding: SPACING.s,
+  },
+  errorItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 4,
+      gap: SPACING.s,
+  },
+  errorText: {
+      fontSize: 12,
+      color: COLORS.textSecondary,
+      flex: 1,
   }
 });
 

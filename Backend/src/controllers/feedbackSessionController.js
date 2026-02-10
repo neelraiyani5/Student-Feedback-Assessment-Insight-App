@@ -139,17 +139,39 @@ export const submitFeedback = async (req, res) => {
 export const getSessionResponses = async (req, res) => {
     try {
         const { sessionId } = req.params;
-
-        // Verification logic for CC could be added here (check if CC of the class)
+        const userRole = req.user.role;
 
         const responses = await prisma.feedbackResponse.findMany({
             where: { sessionId },
             include: {
-                student: { select: { name: true, userId: true } }
+                student: userRole === 'HOD' ? { select: { name: true, userId: true } } : false
             }
         });
 
-        res.status(200).json(responses);
+        // 1. Calculate Stats on Backend to save frontend processing
+        const questionMap = {};
+        responses.forEach(resp => {
+            if (resp.answers && Array.isArray(resp.answers)) {
+                resp.answers.forEach(ans => {
+                    if (!questionMap[ans.question]) {
+                        questionMap[ans.question] = {};
+                    }
+                    questionMap[ans.question][ans.answer] = (questionMap[ans.question][ans.answer] || 0) + 1;
+                });
+            }
+        });
+
+        const stats = Object.keys(questionMap).map(qText => ({
+            question: qText,
+            options: questionMap[qText]
+        }));
+
+        res.status(200).json({
+            responses: userRole === 'HOD' ? responses : [], // Only HOD gets individual rows
+            stats,
+            total: responses.length,
+            requesterRole: userRole
+        });
     } catch (error) {
         console.error("Error fetching session responses:", error);
         res.status(500).json({ message: "Failed to fetch responses" });

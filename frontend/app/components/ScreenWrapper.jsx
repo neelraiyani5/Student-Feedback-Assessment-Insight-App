@@ -1,54 +1,22 @@
 import React from 'react';
-import { View, StyleSheet, Platform, StatusBar } from 'react-native';
-import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
-import { COLORS, SPACING } from '../constants/theme';
+import { StyleSheet, View, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { COLORS } from '../constants/theme';
 
-/**
- * ScreenWrapper Component
- * Handles safe area insets and standard padding for screens.
- */
-const ScreenWrapperContent = ({ 
-  children, 
-  style, 
-  backgroundColor = COLORS.surface,
-  withPadding = true 
-}) => {
-  const insets = useSafeAreaInsets();
-
+const ScreenWrapper = ({ children, backgroundColor = COLORS.white, withPadding = true }) => {
   return (
-    <View style={[
-      styles.container, 
-      { 
-        backgroundColor,
-        paddingTop: insets.top,
-        paddingBottom: insets.bottom,
-        paddingLeft: insets.left,
-        paddingRight: insets.right
-      }
-    ]}>
-      <StatusBar 
-        barStyle="dark-content" 
-        backgroundColor={backgroundColor} 
-        translucent={Platform.OS === 'android'}
-      />
-      <View 
-        style={[
-          styles.content, 
-          withPadding && styles.padding,
-          style
-        ]}
-      >
+    <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['right', 'top', 'left']}>
+      <StatusBar barStyle="dark-content" backgroundColor={backgroundColor} />
+      <View style={[
+        styles.content, 
+        { backgroundColor },
+        withPadding && styles.padding
+      ]}>
         {children}
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
-
-const ScreenWrapper = (props) => (
-  <SafeAreaProvider>
-    <ScreenWrapperContent {...props} />
-  </SafeAreaProvider>
-);
 
 const styles = StyleSheet.create({
   container: {
@@ -58,8 +26,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   padding: {
-    paddingHorizontal: SPACING.m,
-  }
+    paddingHorizontal: 16,
+  },
 });
 
 export default ScreenWrapper;

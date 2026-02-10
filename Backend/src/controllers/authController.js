@@ -17,7 +17,7 @@ export const login = async (req, res) => {
     if (!isMatch)
       return res.status(401).json({ message: "Invalid Credentials!!!" });
 
-    const token = generateToken(user.id);
+    const token = generateToken(user.id, user.role);
 
     res
       .status(200)
@@ -32,25 +32,33 @@ export const login = async (req, res) => {
 };
 
 export const getme = async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { id: req.user.id },
-    include: {
-      hodDepartments: true,
-      subjects: {
-        include: {
-          semester: true,
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        userId: true,
+        name: true,
+        email: true,
+        role: true,
+        hodDepartments: {
+          select: { id: true, name: true }
         },
-      },
-      courseFileAssignments: {
-        include: {
-          subject: true,
-          class: true,
-        },
-      },
-      classesCoordinated: true,
-    },
-  });
-  res.status(200).json({ user });
+        classesCoordinated: {
+          select: { id: true, name: true }
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ user });
+  } catch (error) {
+    console.error("Error in getme:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
 
 export const changePassword = async (req, res) => {

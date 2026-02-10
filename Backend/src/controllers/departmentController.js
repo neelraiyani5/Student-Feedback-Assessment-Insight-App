@@ -11,7 +11,6 @@ export const getDepartmentOverview = async (req, res) => {
                 name: true,
                 semesters: {
                     include: { 
-                        subjects: true,
                         classes: {
                             include: {
                                 cc: {

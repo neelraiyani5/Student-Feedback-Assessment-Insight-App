@@ -115,6 +115,35 @@ export const clearToken = async () => {
   }
 };
 
+export const getUserInfoFromToken = async () => {
+  const token = await getToken();
+  if (!token) return null;
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    return JSON.parse(jsonPayload); 
+  } catch (e) {
+    // Fallback for simple character decoding if atob behaves differently or payload is long
+    try {
+        const base64Url = token.split('.')[1];
+        const jsonPayload = Buffer.from(base64Url, 'base64').toString();
+        return JSON.parse(jsonPayload);
+    } catch (e2) {
+        return null;
+    }
+  }
+};
+
+export const getDashboardSummary = async () => {
+  try {
+    const response = await api.get("/dashboard/summary");
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
 export const createDepartment = async (data) => {
   try {
     const response = await api.post("/department/create", data);
@@ -190,6 +219,32 @@ export const assignCC = async (data) => {
 export const createStudent = async (data) => {
   try {
     const response = await api.post("/class/student/create", data);
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const bulkUploadStudents = async (formData) => {
+  try {
+    const response = await api.post("/user/bulk-upload?role=STUDENT", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const bulkUploadFaculty = async (formData) => {
+  try {
+    const response = await api.post("/user/bulk-upload?role=FACULTY", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : error;

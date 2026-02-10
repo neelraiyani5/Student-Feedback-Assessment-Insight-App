@@ -171,14 +171,21 @@ export const bulkUploadUsers = async (req, res) => {
                 const password = Math.random().toString(36).slice(-8);
                 const hashedPassword = await bcrypt.hash(password, 10);
 
+                const userData = {
+                    userId: userid.toString(),
+                    name,
+                    email: email,
+                    password: hashedPassword,
+                    role: role
+                };
+
+                // If a CC is uploading students, automatically assign them to the CC's class
+                if (role === 'STUDENT' && req.user.role === 'CC' && req.user.classId) {
+                    userData.classId = req.user.classId;
+                }
+
                 await prisma.user.create({
-                    data: {
-                        userId: userid.toString(),
-                        name,
-                        email: email,
-                        password: hashedPassword,
-                        role: role
-                    }
+                    data: userData
                 });
 
                 // Send email

@@ -17,12 +17,7 @@ import ScreenWrapper from "../../components/ScreenWrapper";
 import { COLORS, FONTS, SPACING, LAYOUT } from "../../constants/theme";
 import { wp, hp } from "../../utils/responsive";
 import {
-  getMyProfile,
-  getDepartmentCourseAssignments,
-  getClassCourseAssignments,
-  getComplianceAlerts,
-  getMyCourseAssignments,
-  getSubjects,
+  getDashboardSummary,
 } from "../../services/api";
 
 const CoordinatorDashboard = () => {
@@ -48,164 +43,33 @@ const CoordinatorDashboard = () => {
   const fetchDashboardData = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
     try {
-      const profile = await getMyProfile();
-      if (profile && profile.user) {
-        setUser(profile.user);
-
-        let adminAssignments = [];
-        if (profile.user.role === "HOD") {
-          adminAssignments = await getDepartmentCourseAssignments();
-        } else if (profile.user.role === "CC") {
-          // 1. Fetch Assignments (the ones with progress)
-          if (
-            profile.user.classesCoordinated &&
-            profile.user.classesCoordinated.length > 0
-          ) {
-            for (const cls of profile.user.classesCoordinated) {
-              try {
-                const clsAssign = await getClassCourseAssignments(cls.id);
-                adminAssignments = [...adminAssignments, ...clsAssign];
-              } catch (e) {
-                console.log(`Error fetching assignments for class ${cls.id}`, e);
-              }
-            }
-          }
-
-          // 2. Fetch all Subjects for the CC's class (to identify unassigned ones)
-          try {
-            const subjectsData = await getSubjects();
-            const classSubjects = subjectsData.subjects || [];
-
-            const combinedList = classSubjects.map((subject) => {
-              const assignment = adminAssignments.find(
-                (a) => a.subjectId === subject.id,
-              );
-
-              const globalFaculty =
-                subject.faculties && subject.faculties.length > 0
-                  ? subject.faculties.map((f) => f.name).join(", ")
-                  : "Unassigned";
-
-              if (assignment) {
-                const total = assignment.progress?.total || 0;
-                const completed = assignment.progress?.completed || 0;
-                const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-                return {
-                  id: assignment.id,
-                  subjectId: subject.id,
-                  classId: assignment.classId,
-                  name: subject.name,
-                  faculty: globalFaculty, // Use all faculties, not just the assignment's faculty
-                  facultyId: assignment.facultyId,
-                  class: assignment.class.name,
-                  className: assignment.class.name,
-                  progress: percent,
-                  isAssigned: true,
-                };
-              } else {
-                return {
-                  id: `unassigned-${subject.id}`,
-                  subjectId: subject.id,
-                  name: subject.name,
-                  faculty: globalFaculty,
-                  class: profile.user.classesCoordinated[0]?.name || "N/A",
-                  className: profile.user.classesCoordinated[0]?.name || "N/A",
-                  progress: 0,
-                  isAssigned: false,
-                };
-              }
-            });
-
-            setDeptStatus(combinedList);
-          } catch (e) {
-            console.log("Error merging class subjects", e);
-          }
-        }
-
-        // 3. Fetch Personal Teaching Assignments (for "My Subjects" section)
-        let myAssign = [];
-        try {
-          myAssign = await getMyCourseAssignments();
-          setMyAssignments(myAssign || []);
-        } catch (e) {
-          console.error("Error fetching my assignments", e);
-        }
-
-        // 4. Process Administrative Assignments for Stats (HOD/CC level)
-        let totalTasks = 0;
-        let completedTasks = 0;
-
-        const processedAdminList = adminAssignments.map((a) => {
-          const total = a?.progress?.total || 0;
-          const completed = a?.progress?.completed || 0;
-          totalTasks += total;
-          completedTasks += completed;
-
-          const progressPercent =
-            total > 0 ? Math.round((completed / total) * 100) : 0;
-
-          return {
-            id: a.id,
-            subjectId: a.subjectId,
-            classId: a.classId,
-            name: a.subject.name,
-            className: a.class.name,
-            progress: progressPercent,
-            faculty: a.faculty.name,
-            facultyId: a.facultyId,
-            isAssigned: true,
-            status:
-              progressPercent >= 90
-                ? "Good"
-                : progressPercent >= 50
-                  ? "Warning"
-                  : "Risk",
-          };
-        });
-
-        // For HOD, deptStatus is just the processed list
-        if (profile.user.role === "HOD") {
-          setDeptStatus(processedAdminList);
-        }
-
-        // 5. Consolidate "My Subjects" logic for Dashboard
-        // For CC/HOD, "My Subjects" should include subjects they teach across ANY class
-        setMyAssignments(myAssign || []);
-
-        // Calculate Aggregate Compliance for the Top Status Card
-        const completedPercent =
-          totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-        const getStatusColor = (percent) => {
-          if (percent >= 75) return COLORS.success;
-          if (percent >= 40) return COLORS.warning;
-          return COLORS.error;
-        };
-
-        const statusColor = getStatusColor(completedPercent);
-
+        const data = await getDashboardSummary();
+        
+        setUser(data.user);
+        setMyAssignments(data.myAssignments || []);
+        setDeptStatus(data.monitoringData || []);
+        
         setComplianceStats({
-          completed: completedPercent,
+          completed: data.summaryStats.compliance,
           inProgress: 0,
-          pending: 100 - completedPercent,
-          totalCount: totalTasks,
-          completedCount: completedTasks,
-          color: statusColor,
+          pending: 100 - data.summaryStats.compliance,
+          totalCount: data.summaryStats.totalCount,
+          completedCount: data.summaryStats.completedCount,
+          color: data.summaryStats.compliance >= 75 ? COLORS.success : (data.summaryStats.compliance >= 40 ? COLORS.warning : COLORS.error),
         });
-      }
+
     } catch (err) {
       console.error("Failed to load dashboard data", err);
+      // Fallback for offline or errors
     } finally {
-      if (!isRefresh) setLoading(false);
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    fetchDashboardData(true).finally(() => {
-      setRefreshing(false);
-    });
+    fetchDashboardData(true);
   }, []);
 
   return (
@@ -690,8 +554,8 @@ const CoordinatorDashboard = () => {
             deptStatus.map((item) => {
               // Check if the current user is the faculty for this item
               const isMe = item.isAssigned && (
-                item.facultyId === user.id || 
-                (item.faculty && item.faculty.includes(user.name))
+                item.facultyId === user?.id || 
+                (item.faculty && user?.name && item.faculty.includes(user.name))
               );
 
               return (
@@ -794,10 +658,10 @@ const CoordinatorDashboard = () => {
               >
                 <View style={styles.subjectItemContent}>
                   <AppText style={styles.subjectItemName}>
-                    {assignment.subject.name}
+                    {assignment.name || assignment.subject?.name}
                   </AppText>
                   <AppText variant="caption" style={styles.subjectItemMeta}>
-                    Class: {assignment.class.name}
+                    Class: {assignment.className || assignment.class?.name}
                   </AppText>
                 </View>
                 <Ionicons

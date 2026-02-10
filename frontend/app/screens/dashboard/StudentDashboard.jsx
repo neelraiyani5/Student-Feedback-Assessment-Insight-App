@@ -8,7 +8,7 @@ import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
 import { wp, hp } from '../../utils/responsive';
-import { getStudentSubjects, getStudentSessions } from '../../services/api';
+import { getDashboardSummary } from '../../services/api';
 
 const StudentDashboard = () => {
     const router = useRouter();
@@ -22,12 +22,9 @@ const StudentDashboard = () => {
 
     const fetchData = async () => {
         try {
-            const [subjectsData, sessionsData] = await Promise.all([
-                getStudentSubjects(),
-                getStudentSessions()
-            ]);
-            setSubjects(subjectsData.subjects || []);
-            setPendingFeedbackCount(sessionsData ? sessionsData.length : 0);
+            const data = await getDashboardSummary();
+            setSubjects(data.monitoringData || []);
+            setPendingFeedbackCount(data.summaryStats.pendingFeedbackCount || 0);
         } catch (error) {
             console.log("Error fetching dashboard data", error);
         }
