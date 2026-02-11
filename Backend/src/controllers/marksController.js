@@ -1,4 +1,6 @@
 import prisma from "../prisma/client.js";
+import xlsx from "xlsx";
+import fs from "fs";
 
 export const addMarks = async (req, res) => {
     try {
@@ -35,8 +37,119 @@ export const addMarks = async (req, res) => {
         });
 
         res.status(201).json(marks);
-    } catch {
+    } catch (error) {
+        console.error("Add Marks Error:", error);
         res.status(500).json({ message: "Failed to add marks" });
+    }
+}
+
+export const bulkUploadMarks = async (req, res) => {
+    try {
+        const { assessmentId, studentIdColumn, marksColumn } = req.body;
+        const facultyId = req.user.id;
+
+        if (!req.file) {
+            return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const assessment = await prisma.assessment.findUnique({
+            where: { id: assessmentId },
+            include: { subject: true }
+        });
+
+        if (!assessment || assessment.subject.facultyId !== facultyId) {
+            if (req.file) fs.unlinkSync(req.file.path);
+            return res.status(403).json({ message: "Unauthorized or Assessment not found" });
+        }
+
+        const filePath = req.file.path;
+        const workbook = xlsx.readFile(filePath);
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const sheetData = xlsx.utils.sheet_to_json(sheet);
+
+        if (sheetData.length === 0) {
+            fs.unlinkSync(filePath);
+            return res.status(400).json({ message: "The uploaded file is empty" });
+        }
+
+        // Validate columns
+        const actualColumns = Object.keys(sheetData[0]);
+        if (!actualColumns.includes(studentIdColumn) || !actualColumns.includes(marksColumn)) {
+            fs.unlinkSync(filePath);
+            return res.status(400).json({
+                message: `Column(s) not found. Expected: ${studentIdColumn}, ${marksColumn}. Found: ${actualColumns.join(", ")}`
+            });
+        }
+
+        const results = [];
+        const errors = [];
+
+        for (const row of sheetData) {
+            const studentUserid = row[studentIdColumn]?.toString();
+            const marksObtained = parseInt(row[marksColumn]);
+
+            if (!studentUserid || isNaN(marksObtained)) {
+                errors.push({ row, error: "Missing or invalid data in row" });
+                continue;
+            }
+
+            if (marksObtained > assessment.maxMarks) {
+                errors.push({ studentUserid, marksObtained, error: `Marks exceed max marks (${assessment.maxMarks})` });
+                continue;
+            }
+
+            try {
+                // Find student by userid and ensure they are in the correct class
+                const student = await prisma.user.findFirst({
+                    where: {
+                        userId: studentUserid,
+                        classId: assessment.classId,
+                        role: "STUDENT"
+                    }
+                });
+
+                if (!student) {
+                    errors.push({ studentUserid, error: "Student not found in this class" });
+                    continue;
+                }
+
+                // Upsert marks
+                await prisma.marks.upsert({
+                    where: {
+                        studentId_assessmentId: {
+                            studentId: student.id,
+                            assessmentId: assessment.id
+                        }
+                    },
+                    update: { marksObtained },
+                    create: {
+                        studentId: student.id,
+                        assessmentId: assessment.id,
+                        marksObtained
+                    }
+                });
+
+                results.push({ studentUserid, status: "Success" });
+            } catch (err) {
+                errors.push({ studentUserid, error: err.message });
+            }
+        }
+
+        fs.unlinkSync(filePath);
+
+        res.status(200).json({
+            message: "Bulk upload completed",
+            totalProcessed: sheetData.length,
+            successCount: results.length,
+            failureCount: errors.length,
+            errors
+        });
+
+    } catch (error) {
+        if (req.file) fs.unlinkSync(req.file.path);
+        console.error("Bulk Upload Error:", error);
+        res.status(500).json({ message: "Failed to process bulk upload", error: error.message });
     }
 }
 

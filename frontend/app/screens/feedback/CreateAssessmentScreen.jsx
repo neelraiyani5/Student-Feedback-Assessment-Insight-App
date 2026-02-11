@@ -8,13 +8,13 @@ import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
 import { getMyProfile, getSubjectClasses, createAssessment } from '../../services/api';
 
-const COMPONENT_TYPES = ['CSE', 'IA', 'ESE'];
+const COMPONENT_TYPES = ['CSE', 'IA', 'ESE', 'TW'];
 
 const CreateAssessmentScreen = () => {
     const router = useRouter();
     const params = useLocalSearchParams();
     const [loading, setLoading] = useState(false);
-    
+
     // Data
     const [mySubjects, setMySubjects] = useState([]);
     const [availableClasses, setAvailableClasses] = useState([]);
@@ -109,32 +109,32 @@ const CreateAssessmentScreen = () => {
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-                
+
                 {!params.subjectId && renderDropdown("Subject", selectedSubject?.name, "Select Subject", () => setSubjectModalVisible(true))}
-                
+
                 {!params.classId && renderDropdown("Class", selectedClass?.name, "Select Class", () => {
-                    if(!selectedSubject) Alert.alert("Wait", "Select a Subject first");
+                    if (!selectedSubject) Alert.alert("Wait", "Select a Subject first");
                     else setClassModalVisible(true);
                 })}
 
                 {(params.subjectName || params.className) && (
                     <View style={styles.infoBox}>
-                         <View style={styles.infoRow}>
+                        <View style={styles.infoRow}>
                             <Ionicons name="book" size={16} color={COLORS.primary} />
                             <AppText style={styles.infoText}>{params.subjectName}</AppText>
-                         </View>
-                         <View style={styles.infoRow}>
+                        </View>
+                        <View style={styles.infoRow}>
                             <Ionicons name="people" size={16} color={COLORS.primary} />
                             <AppText style={styles.infoText}>{params.className}</AppText>
-                         </View>
+                        </View>
                     </View>
                 )}
 
                 <View style={styles.inputGroup}>
                     <AppText variant="caption" style={styles.label}>Assessment Title</AppText>
-                    <TextInput 
-                        style={styles.textInput} 
-                        placeholder="e.g. Unit Test 1" 
+                    <TextInput
+                        style={styles.textInput}
+                        placeholder="e.g. Unit Test 1"
                         value={title}
                         onChangeText={setTitle}
                     />
@@ -144,17 +144,17 @@ const CreateAssessmentScreen = () => {
 
                 <View style={styles.inputGroup}>
                     <AppText variant="caption" style={styles.label}>Max Marks</AppText>
-                    <TextInput 
-                        style={styles.textInput} 
-                        placeholder="e.g. 20" 
+                    <TextInput
+                        style={styles.textInput}
+                        placeholder="e.g. 20"
                         value={maxMarks}
                         onChangeText={setMaxMarks}
                         keyboardType="numeric"
                     />
                 </View>
 
-                <TouchableOpacity 
-                    style={[styles.createButton, loading && { opacity: 0.7 }]} 
+                <TouchableOpacity
+                    style={[styles.createButton, loading && { opacity: 0.7 }]}
                     onPress={handleCreate}
                     disabled={loading}
                 >
@@ -169,14 +169,14 @@ const CreateAssessmentScreen = () => {
             <Modal visible={subjectModalVisible} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                        <AppText variant="h3" style={{marginBottom: 10}}>Select Subject</AppText>
-                        <FlatList 
+                        <AppText variant="h3" style={{ marginBottom: 10 }}>Select Subject</AppText>
+                        <FlatList
                             data={mySubjects}
                             keyExtractor={item => item.id}
-                            renderItem={({item}) => (
+                            renderItem={({ item }) => (
                                 <TouchableOpacity style={styles.optionItem} onPress={() => { setSelectedSubject(item); setSubjectModalVisible(false); }}>
                                     <AppText>{item.name}</AppText>
-                                    {selectedSubject?.id === item.id && <Ionicons name="checkmark" size={20} color={COLORS.primary}/>}
+                                    {selectedSubject?.id === item.id && <Ionicons name="checkmark" size={20} color={COLORS.primary} />}
                                 </TouchableOpacity>
                             )}
                         />
@@ -189,19 +189,19 @@ const CreateAssessmentScreen = () => {
             <Modal visible={classModalVisible} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                        <AppText variant="h3" style={{marginBottom: 10}}>Select Class</AppText>
-                        {availableClasses.length === 0 ? <AppText style={{fontStyle:'italic', color: COLORS.textSecondary}}>No classes found.</AppText> : null}
-                        <FlatList 
+                        <AppText variant="h3" style={{ marginBottom: 10 }}>Select Class</AppText>
+                        {availableClasses.length === 0 ? <AppText style={{ fontStyle: 'italic', color: COLORS.textSecondary }}>No classes found.</AppText> : null}
+                        <FlatList
                             data={availableClasses}
                             keyExtractor={item => item.id}
-                            renderItem={({item}) => (
+                            renderItem={({ item }) => (
                                 <TouchableOpacity style={styles.optionItem} onPress={() => { setSelectedClass(item); setClassModalVisible(false); }}>
                                     <AppText>{item.name}</AppText>
-                                    {selectedClass?.id === item.id && <Ionicons name="checkmark" size={20} color={COLORS.primary}/>}
+                                    {selectedClass?.id === item.id && <Ionicons name="checkmark" size={20} color={COLORS.primary} />}
                                 </TouchableOpacity>
                             )}
                         />
-                         <TouchableOpacity style={styles.closeBtn} onPress={() => setClassModalVisible(false)}><AppText>Close</AppText></TouchableOpacity>
+                        <TouchableOpacity style={styles.closeBtn} onPress={() => setClassModalVisible(false)}><AppText>Close</AppText></TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -209,15 +209,15 @@ const CreateAssessmentScreen = () => {
             {/* Component Modal */}
             <Modal visible={componentModalVisible} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
-                     <View style={[styles.modalContent, {maxHeight: 300}]}>
-                        <AppText variant="h3" style={{marginBottom: 10}}>Select Type</AppText>
+                    <View style={[styles.modalContent, { maxHeight: 300 }]}>
+                        <AppText variant="h3" style={{ marginBottom: 10 }}>Select Type</AppText>
                         {COMPONENT_TYPES.map(type => (
-                             <TouchableOpacity key={type} style={styles.optionItem} onPress={() => { setComponent(type); setComponentModalVisible(false); }}>
+                            <TouchableOpacity key={type} style={styles.optionItem} onPress={() => { setComponent(type); setComponentModalVisible(false); }}>
                                 <AppText>{type}</AppText>
-                                {component === type && <Ionicons name="checkmark" size={20} color={COLORS.primary}/>}
+                                {component === type && <Ionicons name="checkmark" size={20} color={COLORS.primary} />}
                             </TouchableOpacity>
                         ))}
-                     </View>
+                    </View>
                 </View>
             </Modal>
 
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     },
     optionItem: {
         paddingVertical: 16,
-        borderBottomWidth:1,
+        borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
         flexDirection: 'row',
         justifyContent: 'space-between'

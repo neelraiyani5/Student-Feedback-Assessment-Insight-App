@@ -26,17 +26,23 @@ const PerformanceAnalyticsScreen = () => {
 
                 {/* Segment Control */}
                 <View style={styles.segmentContainer}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={[styles.segmentButton, selectedSegment === 'CSE' && styles.segmentActive]}
                         onPress={() => setSelectedSegment('CSE')}
                     >
                         <AppText style={[styles.segmentText, selectedSegment === 'CSE' && styles.segmentTextActive]}>CSE</AppText>
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={[styles.segmentButton, selectedSegment === 'Internal' && styles.segmentActive]}
                         onPress={() => setSelectedSegment('Internal')}
                     >
                         <AppText style={[styles.segmentText, selectedSegment === 'Internal' && styles.segmentTextActive]}>IA</AppText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.segmentButton, selectedSegment === 'TW' && styles.segmentActive]}
+                        onPress={() => setSelectedSegment('TW')}
+                    >
+                        <AppText style={[styles.segmentText, selectedSegment === 'TW' && styles.segmentTextActive]}>TW</AppText>
                     </TouchableOpacity>
                 </View>
 
@@ -46,8 +52,8 @@ const PerformanceAnalyticsScreen = () => {
                         {/* Simulated Gauge Arc using borders */}
                         <View style={styles.gaugeArc} />
                         <View style={styles.gaugeInner}>
-                             <AppText variant="h1" style={styles.percentileText}>85th</AppText>
-                             <AppText variant="body2" style={styles.percentileLabel}>Your Percentile</AppText>
+                            <AppText variant="h1" style={styles.percentileText}>85th</AppText>
+                            <AppText variant="body2" style={styles.percentileLabel}>Your Percentile</AppText>
                         </View>
                     </View>
                     <View style={styles.rankBadge}>
@@ -58,7 +64,7 @@ const PerformanceAnalyticsScreen = () => {
                 {/* Comparison Graph Section */}
                 <View style={styles.graphCard}>
                     <AppText variant="h3" style={styles.graphTitle}>Performance Comparison</AppText>
-                    
+
                     <View style={styles.graphContainer}>
                         {/* Class Average Bar */}
                         <View style={styles.barGroup}>

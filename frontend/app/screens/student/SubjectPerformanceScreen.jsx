@@ -32,11 +32,11 @@ const SubjectPerformanceScreen = () => {
                 getStudentSubjectPerformance(id),
                 getStudentSubjects()
             ]);
-            
+
             setPerformance(perfData);
-            
+
             const sub = subData.subjects?.find(s => s.id === id);
-            if(sub) setSubjectName(sub.name);
+            if (sub) setSubjectName(sub.name);
 
         } catch (error) {
             console.log("Error loading performance", error);
@@ -57,14 +57,14 @@ const SubjectPerformanceScreen = () => {
     if (loading) {
         return (
             <ScreenWrapper backgroundColor={COLORS.surfaceLight}>
-                <ActivityIndicator size="large" color={COLORS.primary} style={{marginTop: 50}} />
+                <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} />
             </ScreenWrapper>
         );
     }
 
     /* Logic for Comparison */
     // performance: { rank, totalStudents, totalObtained, classAverage, components: { IA: {scored, total}, ... } }
-    
+
     return (
         <ScreenWrapper backgroundColor={COLORS.surfaceLight} withPadding={false}>
             {/* Header */}
@@ -72,18 +72,18 @@ const SubjectPerformanceScreen = () => {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
                 </TouchableOpacity>
-                <AppText variant="h3" style={{flex:1}} numberOfLines={1}>{subjectName}</AppText>
+                <AppText variant="h3" style={{ flex: 1 }} numberOfLines={1}>{subjectName}</AppText>
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-                
+
                 {/* Rank Badge */}
                 <View style={styles.rankCard}>
                     <View>
-                        <AppText variant="caption" style={{color: COLORS.white}}>Current Rank</AppText>
-                        <View style={{flexDirection:'row', alignItems:'baseline'}}>
+                        <AppText variant="caption" style={{ color: COLORS.white }}>Current Rank</AppText>
+                        <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                             <AppText style={styles.rankText}>#{performance?.rank}</AppText>
-                            <AppText style={{color:'rgba(255,255,255,0.8)', marginLeft:5}}>
+                            <AppText style={{ color: 'rgba(255,255,255,0.8)', marginLeft: 5 }}>
                                 / {performance?.totalStudents} Students
                             </AppText>
                         </View>
@@ -94,30 +94,30 @@ const SubjectPerformanceScreen = () => {
                 {/* Overall Performance */}
                 <View style={styles.card}>
                     <AppText variant="h3" style={styles.cardTitle}>Overall Performance</AppText>
-                    
+
                     <View style={styles.comparisonRow}>
-                         <View style={styles.compItem}>
-                             <AppText style={styles.compValue}>{performance?.totalObtained}</AppText>
-                             <AppText variant="caption">Your Total</AppText>
-                         </View>
-                         <View style={{width: 1, height: 30, backgroundColor: COLORS.border}} />
-                         <View style={styles.compItem}>
-                             <AppText style={[styles.compValue, {color: COLORS.textSecondary}]}>{Math.round(performance?.classAverage)}</AppText>
-                             <AppText variant="caption">Class Avg</AppText>
-                         </View>
+                        <View style={styles.compItem}>
+                            <AppText style={styles.compValue}>{performance?.totalObtained}</AppText>
+                            <AppText variant="caption">Your Total</AppText>
+                        </View>
+                        <View style={{ width: 1, height: 30, backgroundColor: COLORS.border }} />
+                        <View style={styles.compItem}>
+                            <AppText style={[styles.compValue, { color: COLORS.textSecondary }]}>{Math.round(performance?.classAverage)}</AppText>
+                            <AppText variant="caption">Class Avg</AppText>
+                        </View>
                     </View>
 
-                    <View style={{marginTop: 16}}>
-                        <AppText variant="caption" style={{marginBottom: 8}}>Performance Meter</AppText>
+                    <View style={{ marginTop: 16 }}>
+                        <AppText variant="caption" style={{ marginBottom: 8 }}>Performance Meter</AppText>
                         {/* Mock Visual representation */}
                         <View style={styles.meterContainer}>
-                            <View style={[styles.meterBar, { 
-                                width: `${(performance?.totalObtained / (performance?.components?.IA?.total * 3 || 100)) * 100}%` 
+                            <View style={[styles.meterBar, {
+                                width: `${(performance?.totalObtained / (performance?.components?.IA?.total * 3 || 100)) * 100}%`
                                 // Ideally total marks should be summed from assessment max. 
                                 // But bar logic is purely visual for now.
                             }]} />
                         </View>
-                        <AppText variant="small" style={{textAlign:'right', marginTop:4, color: COLORS.textSecondary}}>
+                        <AppText variant="small" style={{ textAlign: 'right', marginTop: 4, color: COLORS.textSecondary }}>
                             {performance?.totalObtained > performance?.classAverage ? "Above Average" : "Needs Improvement"}
                         </AppText>
                     </View>
@@ -131,42 +131,53 @@ const SubjectPerformanceScreen = () => {
                 <View style={styles.grid}>
                     {/* IA */}
                     <View style={styles.componentCard}>
-                        <View style={[styles.iconBg, {backgroundColor: '#DBEAFE'}]}>
-                            <AppText style={{fontWeight:'bold', color: '#1E40AF'}}>IA</AppText>
+                        <View style={[styles.iconBg, { backgroundColor: '#DBEAFE' }]}>
+                            <AppText style={{ fontWeight: 'bold', color: '#1E40AF' }}>IA</AppText>
                         </View>
                         <AppText style={styles.compTitle}>Internal</AppText>
                         <AppText style={styles.scoreText}>
-                            {performance?.components?.IA?.scored} <AppText variant="small" style={{color:COLORS.textSecondary}}>/ {performance?.components?.IA?.total}</AppText>
+                            {performance?.components?.IA?.scored} <AppText variant="small" style={{ color: COLORS.textSecondary }}>/ {performance?.components?.IA?.total}</AppText>
                         </AppText>
                     </View>
 
                     {/* CSE */}
-                     <View style={styles.componentCard}>
-                        <View style={[styles.iconBg, {backgroundColor: '#DCFCE7'}]}>
-                            <AppText style={{fontWeight:'bold', color: '#166534'}}>CSE</AppText>
+                    <View style={styles.componentCard}>
+                        <View style={[styles.iconBg, { backgroundColor: '#DCFCE7' }]}>
+                            <AppText style={{ fontWeight: 'bold', color: '#166534' }}>CSE</AppText>
                         </View>
                         <AppText style={styles.compTitle}>CSE</AppText>
                         <AppText style={styles.scoreText}>
-                            {performance?.components?.CSE?.scored} <AppText variant="small" style={{color:COLORS.textSecondary}}>/ {performance?.components?.CSE?.total}</AppText>
+                            {performance?.components?.CSE?.scored} <AppText variant="small" style={{ color: COLORS.textSecondary }}>/ {performance?.components?.CSE?.total}</AppText>
                         </AppText>
                     </View>
 
                     {/* ESE */}
-                     <View style={styles.componentCard}>
-                        <View style={[styles.iconBg, {backgroundColor: '#F3E8FF'}]}>
-                            <AppText style={{fontWeight:'bold', color: '#6B21A8'}}>ESE</AppText>
+                    <View style={styles.componentCard}>
+                        <View style={[styles.iconBg, { backgroundColor: '#F3E8FF' }]}>
+                            <AppText style={{ fontWeight: 'bold', color: '#6B21A8' }}>ESE</AppText>
                         </View>
                         <AppText style={styles.compTitle}>End Sem</AppText>
                         <AppText style={styles.scoreText}>
-                            {performance?.components?.ESE?.scored} <AppText variant="small" style={{color:COLORS.textSecondary}}>/ {performance?.components?.ESE?.total}</AppText>
+                            {performance?.components?.ESE?.scored} <AppText variant="small" style={{ color: COLORS.textSecondary }}>/ {performance?.components?.ESE?.total}</AppText>
+                        </AppText>
+                    </View>
+
+                    {/* TW */}
+                    <View style={styles.componentCard}>
+                        <View style={[styles.iconBg, { backgroundColor: '#FEF3C7' }]}>
+                            <AppText style={{ fontWeight: 'bold', color: '#92400E' }}>TW</AppText>
+                        </View>
+                        <AppText style={styles.compTitle}>Term Work</AppText>
+                        <AppText style={styles.scoreText}>
+                            {performance?.components?.TW?.scored || 0} <AppText variant="small" style={{ color: COLORS.textSecondary }}>/ {performance?.components?.TW?.total || 0}</AppText>
                         </AppText>
                     </View>
                 </View>
-                
+
                 {/* Detailed Analysis (Coming Soon placeholder) */}
-                <View style={[styles.card, {marginTop: SPACING.l, alignItems:'center', paddingVertical: 30}]}>
+                <View style={[styles.card, { marginTop: SPACING.l, alignItems: 'center', paddingVertical: 30 }]}>
                     <Ionicons name="analytics" size={40} color={COLORS.textLight} />
-                    <AppText style={{marginTop: 10, color: COLORS.textSecondary}}>Detailed question-wise analysis coming soon.</AppText>
+                    <AppText style={{ marginTop: 10, color: COLORS.textSecondary }}>Detailed question-wise analysis coming soon.</AppText>
                 </View>
 
             </ScrollView>
@@ -181,7 +192,7 @@ const styles = StyleSheet.create({
         padding: SPACING.m,
         gap: SPACING.m,
         backgroundColor: COLORS.white,
-        borderBottomWidth:1,
+        borderBottomWidth: 1,
         borderBottomColor: COLORS.border
     },
     content: {
@@ -209,11 +220,11 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.l,
         elevation: 2,
         shadowColor: "#000",
-        shadowOffset: {width:0,height:2},
-        shadowOpacity:0.05
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05
     },
     cardTitle: {
-        marginBottom: SPACING.l, 
+        marginBottom: SPACING.l,
         color: COLORS.textPrimary
     },
     comparisonRow: {
@@ -245,7 +256,7 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.m
     },
     grid: {
-        flexDirection: 'row', 
+        flexDirection: 'row',
         gap: SPACING.m,
         flexWrap: 'wrap'
     },
@@ -257,7 +268,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
         elevation: 1,
-        borderWidth:1,
+        borderWidth: 1,
         borderColor: COLORS.border
     },
     iconBg: {

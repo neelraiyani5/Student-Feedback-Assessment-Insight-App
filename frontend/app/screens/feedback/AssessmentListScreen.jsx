@@ -8,7 +8,7 @@ import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
 import { getFacultyAssessments, deleteAssessment, updateAssessment, getMyCourseAssignments, getMyProfile } from '../../services/api';
 
-const TABS = ['IA', 'CSE', 'ESE'];
+const TABS = ['IA', 'CSE', 'ESE', 'TW'];
 
 const AssessmentListScreen = () => {
     const router = useRouter();
@@ -59,15 +59,17 @@ const AssessmentListScreen = () => {
             `Delete ${item.title}? This will delete all student marks associated with it.`,
             [
                 { text: "Cancel", style: "cancel" },
-                { text: "Delete", style: 'destructive', onPress: async () => {
-                    try {
-                        await deleteAssessment(item.id);
-                        fetchAssessments();
-                        Alert.alert("Success", "Assessment deleted");
-                    } catch (error) {
-                        Alert.alert("Error", "Failed to delete assessment");
+                {
+                    text: "Delete", style: 'destructive', onPress: async () => {
+                        try {
+                            await deleteAssessment(item.id);
+                            fetchAssessments();
+                            Alert.alert("Success", "Assessment deleted");
+                        } catch (error) {
+                            Alert.alert("Error", "Failed to delete assessment");
+                        }
                     }
-                }}
+                }
             ]
         );
     };
@@ -80,8 +82,8 @@ const AssessmentListScreen = () => {
 
     const handleUpdateAssessment = async () => {
         if (!editForm.title || !editForm.maxMarks) {
-             Alert.alert("Validation", "Fields cannot be empty");
-             return;
+            Alert.alert("Validation", "Fields cannot be empty");
+            return;
         }
 
         try {
@@ -99,10 +101,10 @@ const AssessmentListScreen = () => {
         }
     }
 
-    const filteredAssessments = assessments.filter(a => 
-        a.component === activeTab && 
-        selectedAssignment && 
-        a.subjectId === selectedAssignment.subjectId && 
+    const filteredAssessments = assessments.filter(a =>
+        a.component === activeTab &&
+        selectedAssignment &&
+        a.subjectId === selectedAssignment.subjectId &&
         a.classId === selectedAssignment.classId
     );
 
@@ -132,8 +134,8 @@ const AssessmentListScreen = () => {
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.listContent}
                     renderItem={({ item }) => (
-                        <TouchableOpacity 
-                            style={styles.subjectCard} 
+                        <TouchableOpacity
+                            style={styles.subjectCard}
                             onPress={() => setSelectedAssignment(item)}
                         >
                             <View style={styles.subjectIcon}>
@@ -173,8 +175,8 @@ const AssessmentListScreen = () => {
             {/* Tabs */}
             <View style={styles.tabContainer}>
                 {TABS.map(tab => (
-                    <TouchableOpacity 
-                        key={tab} 
+                    <TouchableOpacity
+                        key={tab}
                         style={[styles.tab, activeTab === tab && styles.activeTab]}
                         onPress={() => setActiveTab(tab)}
                     >
@@ -183,17 +185,17 @@ const AssessmentListScreen = () => {
                 ))}
             </View>
 
-            <FlatList 
+            <FlatList
                 data={filteredAssessments}
                 keyExtractor={item => item.id}
                 contentContainerStyle={styles.listContent}
                 renderItem={({ item }) => (
-                     <View style={styles.card}>
-                        <TouchableOpacity 
+                    <View style={styles.card}>
+                        <TouchableOpacity
                             onPress={() => router.push(`/assessment/${item.id}`)}
                             style={styles.cardHeader}
                         >
-                            <View style={{flex:1}}>
+                            <View style={{ flex: 1 }}>
                                 <AppText style={styles.assessmentTitle}>{item.title}</AppText>
                                 <AppText variant="caption" style={styles.detailText}>
                                     Max Marks: {item.maxMarks}
@@ -205,16 +207,16 @@ const AssessmentListScreen = () => {
                         </TouchableOpacity>
 
                         <View style={styles.cardFooter}>
-                            <AppText variant="caption" style={{color: COLORS.textLight}}>
+                            <AppText variant="caption" style={{ color: COLORS.textLight }}>
                                 Created: {new Date(item.createdAt).toLocaleDateString()}
                             </AppText>
-                            <View style={{flexDirection:'row', gap: 16}}>
-                                 <TouchableOpacity onPress={() => openEditModal(item)}>
-                                     <Ionicons name="pencil" size={20} color={COLORS.textSecondary} />
-                                 </TouchableOpacity>
-                                 <TouchableOpacity onPress={() => handleDeleteAssessment(item)}>
-                                     <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-                                 </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', gap: 16 }}>
+                                <TouchableOpacity onPress={() => openEditModal(item)}>
+                                    <Ionicons name="pencil" size={20} color={COLORS.textSecondary} />
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => handleDeleteAssessment(item)}>
+                                    <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+                                </TouchableOpacity>
                             </View>
                         </View>
                     </View>
@@ -226,12 +228,12 @@ const AssessmentListScreen = () => {
                 }
             />
 
-             <TouchableOpacity 
-                style={styles.fab} 
+            <TouchableOpacity
+                style={styles.fab}
                 onPress={() => router.push({
                     pathname: '/create-assessment',
-                    params: { 
-                        subjectId: selectedAssignment.subjectId, 
+                    params: {
+                        subjectId: selectedAssignment.subjectId,
                         classId: selectedAssignment.classId,
                         subjectName: selectedAssignment.subject.name,
                         className: selectedAssignment.class.name
@@ -243,34 +245,34 @@ const AssessmentListScreen = () => {
 
             {/* Edit Modal */}
             <Modal visible={editModalVisible} transparent animationType="slide">
-                 <View style={styles.modalOverlay}>
+                <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                         <AppText variant="h3" style={{marginBottom:16}}>Edit Assessment</AppText>
-                         <View style={styles.inputGroup}>
+                        <AppText variant="h3" style={{ marginBottom: 16 }}>Edit Assessment</AppText>
+                        <View style={styles.inputGroup}>
                             <AppText variant="caption">Title</AppText>
-                            <TextInput 
-                                style={styles.textInput} 
-                                value={editForm.title} 
-                                onChangeText={t => setEditForm({...editForm, title: t})} 
+                            <TextInput
+                                style={styles.textInput}
+                                value={editForm.title}
+                                onChangeText={t => setEditForm({ ...editForm, title: t })}
                             />
-                         </View>
-                         <View style={styles.inputGroup}>
+                        </View>
+                        <View style={styles.inputGroup}>
                             <AppText variant="caption">Max Marks</AppText>
-                            <TextInput 
-                                style={styles.textInput} 
-                                value={editForm.maxMarks} 
-                                onChangeText={t => setEditForm({...editForm, maxMarks: t})} 
+                            <TextInput
+                                style={styles.textInput}
+                                value={editForm.maxMarks}
+                                onChangeText={t => setEditForm({ ...editForm, maxMarks: t })}
                                 keyboardType="numeric"
                             />
-                         </View>
-                         <View style={styles.modalActions}>
+                        </View>
+                        <View style={styles.modalActions}>
                             <TouchableOpacity onPress={() => setEditModalVisible(false)}><AppText>Cancel</AppText></TouchableOpacity>
-                            <TouchableOpacity onPress={handleUpdateAssessment} style={{marginLeft: 20}}>
-                                <AppText style={{color: COLORS.primary, fontWeight: 'bold'}}>Save</AppText>
+                            <TouchableOpacity onPress={handleUpdateAssessment} style={{ marginLeft: 20 }}>
+                                <AppText style={{ color: COLORS.primary, fontWeight: 'bold' }}>Save</AppText>
                             </TouchableOpacity>
-                         </View>
+                        </View>
                     </View>
-                 </View>
+                </View>
             </Modal>
 
         </ScreenWrapper>
