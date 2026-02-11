@@ -6,10 +6,16 @@ export const createAssessment = async (req, res) => {
         const facultyId = req.user.id;
 
         const subject = await prisma.subject.findFirst({
-            where: { id: subjectId, facultyId }
-        })
+            where: { 
+                id: subjectId,
+                OR: [
+                    { facultyIds: { has: facultyId } },
+                    { semester: { department: { hodId: facultyId } } } // HOD check via relations
+                ]
+            }
+        });
 
-        if (!subject) return res.status(403).json({ message: "Not authorized!!!" });
+        if (!subject) return res.status(403).json({ message: "Not authorized to create assessments for this subject!!!" });
 
         const cls = await prisma.class.findFirst({
             where: { id: classId, semesterId: subject.semesterId }

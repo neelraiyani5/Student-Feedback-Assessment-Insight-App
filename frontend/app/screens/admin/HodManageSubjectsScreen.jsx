@@ -122,9 +122,11 @@ const HodManageSubjectsScreen = () => {
     try {
       const data = await getClassSubjects(classId);
       setSubjects(data.subjects || []);
+      if (data.class) {
+        setSelectedClass(data.class);
+      }
     } catch (error) {
       console.error(error);
-      // Silently handle error - show empty state instead
       setSubjects([]);
     } finally {
       setLoading(false);
@@ -285,12 +287,16 @@ const HodManageSubjectsScreen = () => {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {loading && stage === "semester" ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          </View>
-        ) : stage === "semester" && (
+      {loading && stage === "semester" ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
+            Loading subjects...
+          </AppText>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {stage === "semester" && department && (
           <View style={styles.container}>
             {!department || !department.semesters?.length ? (
               <View style={styles.emptyContainer}>
@@ -380,9 +386,30 @@ const HodManageSubjectsScreen = () => {
         {/* MANAGE SUBJECTS STAGE */}
         {stage === "manage" && selectedClass && (
           <View style={styles.container}>
+            {/* CC Info Card */}
+            <View style={styles.ccCard}>
+              <View style={styles.ccIconContainer}>
+                <Ionicons name="person-circle" size={40} color={COLORS.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText variant="caption" color={COLORS.textSecondary}>Class Coordinator</AppText>
+                <AppText style={styles.ccName}>
+                  {selectedClass.cc?.name || 'Not Assigned'}
+                </AppText>
+              </View>
+              {selectedClass.cc?.email && (
+                <TouchableOpacity onPress={() => {/* Could add email link here */}}>
+                  <Ionicons name="mail-outline" size={24} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
+            </View>
+
             {loading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
+                <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
+                  Loading subjects...
+                </AppText>
               </View>
             ) : subjects.length === 0 ? (
               <View style={styles.emptyContainer}>
@@ -453,6 +480,7 @@ const HodManageSubjectsScreen = () => {
           </View>
         )}
       </ScrollView>
+      )}
 
       {/* CREATE/EDIT SUBJECT MODAL */}
       <Modal
@@ -596,6 +624,7 @@ const styles = StyleSheet.create({
     padding: SPACING.xs,
   },
   scrollContent: {
+    flexGrow: 1,
     padding: SPACING.l,
     paddingBottom: 50,
   },
@@ -743,6 +772,36 @@ const styles = StyleSheet.create({
     padding: SPACING.m,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+  },
+  ccCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    padding: SPACING.m,
+    borderRadius: LAYOUT.radius.m,
+    marginBottom: SPACING.m,
+    elevation: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.secondary,
+    gap: SPACING.m,
+  },
+  ccIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ccName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 

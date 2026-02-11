@@ -88,7 +88,10 @@ const ManageTemplatesScreen = () => {
             </View>
 
             {loading ? (
-                <ActivityIndicator size="large" color={COLORS.primary} style={{marginTop: 50}} />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <AppText style={{marginTop: 12, color: COLORS.textSecondary}}>Loading templates...</AppText>
+                </View>
             ) : (
                 <FlatList 
                     data={templates}
@@ -170,6 +173,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 6
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center'
     },
     emptyContainer: {
         alignItems: 'center',

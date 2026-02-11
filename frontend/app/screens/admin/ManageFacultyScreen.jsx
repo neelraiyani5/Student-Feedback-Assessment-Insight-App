@@ -202,7 +202,10 @@ const ManageFacultyScreen = () => {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} />
+        <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <AppText style={{marginTop: 12, color: COLORS.textSecondary}}>Loading faculty...</AppText>
+        </View>
       ) : (
         <FlatList
           data={faculty}
@@ -410,6 +413,11 @@ const styles = StyleSheet.create({
       shadowOpacity: 0.05,
       shadowRadius: 4,
       elevation: 2,
+  },
+  loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
   },
   avatar: {
       width: 50,

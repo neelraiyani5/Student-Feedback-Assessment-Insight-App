@@ -72,7 +72,10 @@ const FeedbackMonitoringScreen = () => {
             </View>
 
             {loading ? (
-                <ActivityIndicator size="large" color={COLORS.primary} style={{marginTop: 50}} />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <AppText style={{marginTop: 12, color: COLORS.textSecondary}}>Loading sessions...</AppText>
+                </View>
             ) : (
                 <FlatList 
                     data={sessions}
@@ -139,6 +142,11 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: COLORS.success
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center'
     },
     footer: {
         flexDirection: 'row',

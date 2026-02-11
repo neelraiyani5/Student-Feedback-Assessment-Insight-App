@@ -12,7 +12,13 @@ export const addMarks = async (req, res) => {
             include: { subject: true }
         });
 
-        if (!assessment || assessment.subject.facultyId !== facultyId) {
+        if (!assessment) {
+            return res.status(404).json({ message: "Assessment not found" });
+        }
+
+        const isAuthorized = assessment.subject.facultyIds.includes(facultyId) || req.user.role === 'HOD';
+
+        if (!isAuthorized) {
             return res.status(403).json({ message: "Unauthorized" });
         }
 
@@ -57,9 +63,16 @@ export const bulkUploadMarks = async (req, res) => {
             include: { subject: true }
         });
 
-        if (!assessment || assessment.subject.facultyId !== facultyId) {
+        if (!assessment) {
             if (req.file) fs.unlinkSync(req.file.path);
-            return res.status(403).json({ message: "Unauthorized or Assessment not found" });
+            return res.status(404).json({ message: "Assessment not found" });
+        }
+
+        const isAuthorized = assessment.subject.facultyIds.includes(facultyId) || req.user.role === 'HOD';
+
+        if (!isAuthorized) {
+            if (req.file) fs.unlinkSync(req.file.path);
+            return res.status(403).json({ message: "Unauthorized!!!" });
         }
 
         const filePath = req.file.path;
@@ -78,7 +91,7 @@ export const bulkUploadMarks = async (req, res) => {
         if (!actualColumns.includes(studentIdColumn) || !actualColumns.includes(marksColumn)) {
             fs.unlinkSync(filePath);
             return res.status(400).json({
-                message: `Column(s) not found. Expected: ${studentIdColumn}, ${marksColumn}. Found: ${actualColumns.join(", ")}`
+                message: `Column not found. Please check your spelling for "${studentIdColumn}" and "${marksColumn}" in the Excel file.`
             });
         }
 
@@ -201,7 +214,13 @@ export const updateMarks = async (req, res) => {
             }
         });
 
-        if (!marks || marks.assessment.subject.facultyId !== facultyId) {
+        if (!marks) {
+            return res.status(404).json({ message: "Marks record not found" });
+        }
+
+        const isAuthorized = marks.assessment.subject.facultyIds.includes(facultyId) || req.user.role === 'HOD';
+
+        if (!isAuthorized) {
             return res.status(403).json({ message: "Unauthorized" });
         }
 

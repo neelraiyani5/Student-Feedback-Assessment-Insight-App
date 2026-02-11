@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
-import { getTemplates, getSubjectClasses, startFeedbackSession, getMyProfile } from '../../services/api';
+import { getTemplates, getSubjectClasses, startFeedbackSession, getMyProfile, getSubjects } from '../../services/api';
 
 const StartSessionScreen = () => {
     const router = useRouter();
@@ -43,7 +43,20 @@ const StartSessionScreen = () => {
                 getMyProfile()
             ]);
             setTemplates(tmplData || []);
-            setSubjects(userData.user?.subjects || []);
+            
+            // For CCs, show all subjects in their class
+            // For others, show their assigned subjects
+            if (userData.user?.role === 'CC') {
+                try {
+                    const subjectsData = await getSubjects();
+                    setSubjects(subjectsData?.subjects || []);
+                } catch (e) {
+                    console.error("Failed to fetch class subjects", e);
+                    setSubjects(userData.user?.subjects || []);
+                }
+            } else {
+                setSubjects(userData.user?.subjects || []);
+            }
         } catch (error) {
             console.log(error);
             Alert.alert("Error", "Failed to load initial data");
@@ -146,50 +159,50 @@ const StartSessionScreen = () => {
                 <AppText variant="h3">Start Feedback Session</AppText>
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
-                
-                {loading ? (
-                    <ActivityIndicator size="large" color={COLORS.primary} style={{marginTop: 50}} />
-                ) : (
-                    <>
-                        <AppText style={styles.label}>Session Title</AppText>
-                        <TextInput 
-                            style={styles.input}
-                            placeholder="e.g. Unit 1 Feedback"
-                            value={title}
-                            onChangeText={setTitle}
-                        />
+            {loading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <AppText style={{ marginTop: 12, color: COLORS.textSecondary }}>Loading setup data...</AppText>
+                </View>
+            ) : (
+                <ScrollView contentContainerStyle={styles.content}>
+                    <AppText style={styles.label}>Session Title</AppText>
+                    <TextInput 
+                        style={styles.input}
+                        placeholder="e.g. Unit 1 Feedback"
+                        value={title}
+                        onChangeText={setTitle}
+                    />
 
-                        <AppText style={styles.label}>Select Feedback Template</AppText>
-                        {renderDropdown(templates, setSelectedTemplate, selectedTemplate, showTemps, setShowTemps, 'title', 'Select Template')}
+                    <AppText style={styles.label}>Select Feedback Template</AppText>
+                    {renderDropdown(templates, setSelectedTemplate, selectedTemplate, showTemps, setShowTemps, 'title', 'Select Template')}
 
-                        <AppText style={styles.label}>Select Subject</AppText>
-                        {renderDropdown(subjects, handleSubjectSelect, selectedSubject, showSubs, setShowSubs, 'name', 'Select Subject')}
+                    <AppText style={styles.label}>Select Subject</AppText>
+                    {renderDropdown(subjects, handleSubjectSelect, selectedSubject, showSubs, setShowSubs, 'name', 'Select Subject')}
 
-                        <AppText style={styles.label}>Select Class</AppText>
-                        {loadingClasses ? (
-                            <ActivityIndicator size="small" color={COLORS.primary} style={{alignSelf:'flex-start', marginBottom: 16}} />
-                        ) : (
-                            renderDropdown(classes, setSelectedClass, selectedClass, showClasses, setShowClasses, 'name', 'Select Class')
-                        )}
+                    <AppText style={styles.label}>Select Class</AppText>
+                    {loadingClasses ? (
+                        <ActivityIndicator size="small" color={COLORS.primary} style={{alignSelf:'flex-start', marginBottom: 16}} />
+                    ) : (
+                        renderDropdown(classes, setSelectedClass, selectedClass, showClasses, setShowClasses, 'name', 'Select Class')
+                    )}
 
-                        <View style={styles.infoBox}>
-                             <Ionicons name="information-circle" size={20} color={COLORS.primary} />
-                             <AppText style={styles.infoText}>
-                                 Starts a 3-2-1 randomized feedback session. Expires at midnight today.
-                             </AppText>
-                        </View>
+                    <View style={styles.infoBox}>
+                         <Ionicons name="information-circle" size={20} color={COLORS.primary} />
+                         <AppText style={styles.infoText}>
+                             Starts a 3-2-1 randomized feedback session. Expires at midnight today.
+                         </AppText>
+                    </View>
 
-                        <TouchableOpacity 
-                            style={[styles.submitButton, submitting && {opacity: 0.7}]}
-                            onPress={handleStartSession}
-                            disabled={submitting}
-                        >
-                             {submitting ? <ActivityIndicator color={COLORS.white} /> : <AppText style={styles.submitText}>Start Session</AppText>}
-                        </TouchableOpacity>
-                    </>
-                )}
-            </ScrollView>
+                    <TouchableOpacity 
+                        style={[styles.submitButton, submitting && {opacity: 0.7}]}
+                        onPress={handleStartSession}
+                        disabled={submitting}
+                    >
+                         {submitting ? <ActivityIndicator color={COLORS.white} /> : <AppText style={styles.submitText}>Start Session</AppText>}
+                    </TouchableOpacity>
+                </ScrollView>
+            )}
         </ScreenWrapper>
     );
 };
@@ -275,6 +288,11 @@ const styles = StyleSheet.create({
         color: COLORS.white,
         fontWeight: 'bold',
         fontSize: 16
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center'
     }
 });
 

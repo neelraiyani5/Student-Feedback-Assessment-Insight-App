@@ -160,7 +160,10 @@ const ManageSubjectsScreen = () => {
             </View>
 
             {loading ? (
-                <ActivityIndicator size="large" color={COLORS.primary} style={{marginTop: 50}} />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <AppText style={{marginTop: 12, color: COLORS.textSecondary}}>Loading subjects...</AppText>
+                </View>
             ) : (
                 <FlatList 
                     data={subjects}
@@ -284,6 +287,11 @@ const ManageSubjectsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',

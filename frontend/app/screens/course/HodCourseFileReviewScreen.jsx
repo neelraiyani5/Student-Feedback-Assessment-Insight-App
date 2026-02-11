@@ -561,11 +561,12 @@ const HodCourseFileReviewScreen = () => {
               Available Semesters
             </AppText>
             {loading ? (
-              <ActivityIndicator
-                size="large"
-                color={COLORS.primary}
-                style={{ marginVertical: 50 }}
-              />
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
+                  Loading Semesters...
+                </AppText>
+              </View>
             ) : semesters.length === 0 ? (
               <AppText
                 style={{
@@ -613,11 +614,12 @@ const HodCourseFileReviewScreen = () => {
               Subjects with Course Files
             </AppText>
             {loading ? (
-              <ActivityIndicator
-                size="large"
-                color={COLORS.primary}
-                style={{ marginVertical: 50 }}
-              />
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
+                  Loading Subjects...
+                </AppText>
+              </View>
             ) : subjects.length === 0 ? (
               <AppText
                 style={{
@@ -716,11 +718,12 @@ const HodCourseFileReviewScreen = () => {
             </View>
 
             {loading ? (
-              <ActivityIndicator
-                size="large"
-                color={COLORS.primary}
-                style={{ marginVertical: 50 }}
-              />
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
+                  Loading Tasks...
+                </AppText>
+              </View>
             ) : tasks.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons

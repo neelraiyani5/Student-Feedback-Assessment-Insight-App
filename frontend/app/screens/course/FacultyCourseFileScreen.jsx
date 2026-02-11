@@ -108,22 +108,23 @@ const FacultyCourseFileScreen = () => {
         </AppText>
       </View>
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={{ paddingBottom: 40 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {loading ? (
-          <View style={styles.centerContent}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-            <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
-              Loading Assignments...
-            </AppText>
-          </View>
-        ) : assignments.length === 0 ? (
-          <View style={styles.centerContent}>
+      {loading ? (
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
+            Loading Assignments...
+          </AppText>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={{ paddingBottom: 40 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {assignments.length === 0 ? (
+            <View style={styles.centerContent}>
             <View style={styles.emptyIconContainer}>
                 <Ionicons name="folder-open-outline" size={64} color={COLORS.textLight} />
             </View>
@@ -142,6 +143,7 @@ const FacultyCourseFileScreen = () => {
           </View>
         )}
       </ScrollView>
+      )}
     </ScreenWrapper>
   );
 };
@@ -172,7 +174,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 100,
   },
   listContainer: {
     padding: SPACING.l,

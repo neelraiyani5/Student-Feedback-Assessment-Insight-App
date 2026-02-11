@@ -227,30 +227,29 @@ const CCCourseFileReviewScreen = () => {
         </View>
       </View>
 
-      <ScrollView style={styles.content}>
-        {loading ? (
-          <View
-            style={{
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: 100,
-            }}
-          >
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          </View>
-        ) : tasks.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons
-              name="checkmark-done-circle"
-              size={48}
-              color={COLORS.success}
-            />
-            <AppText style={styles.emptyText}>All tasks reviewed!</AppText>
-          </View>
-        ) : (
-          tasks.map((task) => <TaskCard key={task.id} task={task} />)
-        )}
-      </ScrollView>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
+            Loading review tasks...
+          </AppText>
+        </View>
+      ) : (
+        <ScrollView style={styles.content}>
+          {tasks.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons
+                name="checkmark-done-circle"
+                size={48}
+                color={COLORS.success}
+              />
+              <AppText style={styles.emptyText}>All tasks reviewed!</AppText>
+            </View>
+          ) : (
+            tasks.map((task) => <TaskCard key={task.id} task={task} />)
+          )}
+        </ScrollView>
+      )}
 
       {/* Review Modal */}
       <Modal visible={modalVisible} transparent animationType="slide">
@@ -626,6 +625,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceLight,
     padding: SPACING.s,
     borderRadius: 4,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 

@@ -216,7 +216,10 @@ const ManageStudentsScreen = () => {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} />
+        <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <AppText style={{marginTop: 12, color: COLORS.textSecondary}}>Loading students...</AppText>
+        </View>
       ) : (
         <FlatList
           data={students}
@@ -457,6 +460,12 @@ const styles = StyleSheet.create({
       textAlign: 'center',
       marginTop: 50,
       color: COLORS.textSecondary,
+      fontStyle: 'italic'
+  },
+  loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center'
   },
   modalOverlay: {
       flex: 1,

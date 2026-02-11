@@ -8,10 +8,17 @@ export const assignSubjectFaculty = async (req, res) => {
 
         const ccId = req.user.id;
 
-        // 1. Verify user is CC for this class
+        // 1. Verify user is CC for this class OR HOD
         const classData = await prisma.class.findUnique({ where: { id: classId } });
-        if (!classData || classData.ccId !== ccId) {
-            return res.status(403).json({ message: "You are not the Class Coordinator for this class" });
+        if (!classData) {
+            return res.status(404).json({ message: "Class not found" });
+        }
+
+        const isCC = classData.ccId === ccId;
+        const isHOD = req.user.role === 'HOD';
+
+        if (!isCC && !isHOD) {
+            return res.status(403).json({ message: "You are not authorized to assign subjects in this class" });
         }
 
         // 2. Create Assignment
@@ -146,9 +153,12 @@ export const getMyAssignments = async (req, res) => {
         const facultyId = req.user.id;
         const assignments = await prisma.courseFileAssignment.findMany({
             where: { facultyId },
-            include: {
+            select: {
+                id: true,
+                subjectId: true,
+                classId: true,
                 subject: { select: { id: true, name: true } },
-                class: { select: { id: true, name: true, semester: true } },
+                class: { select: { id: true, name: true } },
                 _count: {
                     select: {
                         tasks: true

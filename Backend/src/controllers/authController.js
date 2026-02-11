@@ -41,11 +41,15 @@ export const getme = async (req, res) => {
         name: true,
         email: true,
         role: true,
+        classId: true,
+        subjects: {
+          select: { id: true, name: true, semesterId: true }
+        },
         hodDepartments: {
           select: { id: true, name: true }
         },
         classesCoordinated: {
-          select: { id: true, name: true }
+          select: { id: true, name: true, semesterId: true }
         }
       }
     });

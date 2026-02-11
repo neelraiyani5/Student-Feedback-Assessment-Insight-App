@@ -74,7 +74,10 @@ export const getClassSubjects = async (req, res) => {
 
     const classData = await prisma.class.findUnique({
       where: { id: classId },
-      include: { semester: true },
+      include: { 
+        semester: true,
+        cc: { select: { id: true, name: true, email: true } }
+      },
     });
 
     if (!classData) {
@@ -89,7 +92,7 @@ export const getClassSubjects = async (req, res) => {
       },
     });
 
-    res.status(200).json({ subjects });
+    res.status(200).json({ subjects, class: classData });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to fetch subjects" });
@@ -315,16 +318,19 @@ export const assignFacultyToSubject = async (req, res) => {
       where: { semesterId: subject.semesterId }
     });
 
-    // Add to Added Faculty & Generate Course Files
+    // Add/Verify CourseFileAssignments for ALL current faculty
     await Promise.all(
-      addedIds.map(async (uid) => {
-        // Update User Subject List
-        await prisma.user.update({
-          where: { id: uid },
-          data: { subjectIds: { push: subjectId } },
-        });
+      newFacultyIds.map(async (uid) => {
+        // Update User Subject List (Old mechanism sync)
+        const user = await prisma.user.findUnique({ where: { id: uid } });
+        if (user && !user.subjectIds.includes(subjectId)) {
+          await prisma.user.update({
+            where: { id: uid },
+            data: { subjectIds: { push: subjectId } },
+          });
+        }
 
-        // Create CourseFileAssignment for each class in semester
+        // Create CourseFileAssignment for each class in semester (New mechanism sync)
         for (const cls of classesInSemester) {
           const existingAssignment = await prisma.courseFileAssignment.findUnique({
             where: {

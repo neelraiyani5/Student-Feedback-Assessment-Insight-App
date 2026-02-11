@@ -41,6 +41,8 @@ export const getDashboardSummary = async (req, res) => {
                     where: { facultyId: userId },
                     select: {
                         id: true,
+                        subjectId: true,
+                        classId: true,
                         subject: { select: { id: true, name: true } },
                         class: { select: { id: true, name: true } },
                         _count: { select: { tasks: true } }
@@ -84,8 +86,12 @@ export const getDashboardSummary = async (req, res) => {
             
             myAssignments = assignments.map(a => ({
                 id: a.id,
+                subjectId: a.subjectId,
+                classId: a.classId,
                 name: a.subject.name,
                 className: a.class.name,
+                subject: a.subject,
+                class: a.class,
                 progress: a._count.tasks > 0 ? Math.round(((myCountsMap[a.id] || 0) / a._count.tasks) * 100) : 0
             }));
             rawUpcomingTasks = tasks;

@@ -251,6 +251,19 @@ export const bulkUploadFaculty = async (formData) => {
   }
 };
 
+export const bulkUploadMarks = async (formData) => {
+  try {
+    const response = await api.post("/marks/bulk-upload", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
 export const getClassStudents = async (classId) => {
   try {
     const response = await api.get(`/class/students/${classId}`);
@@ -337,9 +350,13 @@ export const createAssessment = async (data) => {
   }
 };
 
-export const getFacultyAssessments = async () => {
+export const getFacultyAssessments = async (subjectId, classId) => {
   try {
-    const response = await api.get("/class/assessments/list");
+    let url = "/class/assessments/list";
+    if (subjectId || classId) {
+      url += `?${subjectId ? `subjectId=${subjectId}` : ""}${subjectId && classId ? "&" : ""}${classId ? `classId=${classId}` : ""}`;
+    }
+    const response = await api.get(url);
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : error;

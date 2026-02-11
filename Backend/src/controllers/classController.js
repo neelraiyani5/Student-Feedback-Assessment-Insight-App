@@ -597,14 +597,23 @@ export const createAssessment = async (req, res) => {
 
 export const getFacultyAssessments = async (req, res) => {
   try {
+    const { subjectId, classId } = req.query;
     const uid = req.user.id;
-    const user = await prisma.user.findUnique({ where: { id: uid } });
 
-    if (!user || !user.subjectIds)
-      return res.status(200).json({ assessments: [] });
+    const where = {};
+    if (subjectId) where.subjectId = subjectId;
+    if (classId) where.classId = classId;
+
+    // If no specific filters, default to user's assigned subjects
+    if (!subjectId) {
+      const user = await prisma.user.findUnique({ where: { id: uid } });
+      if (!user || !user.subjectIds)
+        return res.status(200).json({ assessments: [] });
+      where.subjectId = { in: user.subjectIds };
+    }
 
     const assessments = await prisma.assessment.findMany({
-      where: { subjectId: { in: user.subjectIds } },
+      where,
       include: { class: true, subject: true },
       orderBy: { createdAt: "desc" },
     });

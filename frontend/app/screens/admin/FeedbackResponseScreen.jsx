@@ -87,7 +87,9 @@ const FeedbackResponseScreen = () => {
             </View>
 
             {loading ? (
-                <ActivityIndicator size="large" color={COLORS.primary} style={{marginTop: 50}} />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
             ) : (
                 <FlatList 
                     data={userRole === 'HOD' && showIndividual ? responses : []}

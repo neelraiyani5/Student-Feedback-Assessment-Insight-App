@@ -54,10 +54,15 @@ const HodAssessmentsScreen = () => {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.container}>
-        {loading ? (
+      {loading ? (
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-        ) : (
+          <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
+            Loading assessments...
+          </AppText>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.container}>
           <View style={styles.emptyContainer}>
             <Ionicons
               name="clipboard-outline"
@@ -68,8 +73,8 @@ const HodAssessmentsScreen = () => {
               Assessment management coming soon
             </AppText>
           </View>
-        )}
-      </ScrollView>
+        </ScrollView>
+      )}
     </ScreenWrapper>
   );
 };
@@ -83,6 +88,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerTitle: {
     color: COLORS.textPrimary,

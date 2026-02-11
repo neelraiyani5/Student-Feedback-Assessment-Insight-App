@@ -298,29 +298,33 @@ const ManageCurriculumScreen = () => {
         )}
       </View>
 
-      <ScrollView 
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} color={COLORS.primary} />
-        }
-      >
-        {loading && !department ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          </View>
-        ) : !department ? (
-          <View style={styles.emptyContainer}>
-            <AppText style={styles.emptyText}>
-              You haven't created a department yet.
-            </AppText>
-            <TouchableOpacity
-              style={styles.bigButton}
-              onPress={() => setDeptModalVisible(true)}
-            >
-              <AppText style={styles.bigButtonText}>Create Department</AppText>
-            </TouchableOpacity>
-          </View>
-        ) : (
+      {loading && !department ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
+            Loading curriculum...
+          </AppText>
+        </View>
+      ) : (
+        <ScrollView 
+          contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} color={COLORS.primary} />
+          }
+        >
+          {!department ? (
+            <View style={styles.emptyContainer}>
+              <AppText style={styles.emptyText}>
+                You haven't created a department yet.
+              </AppText>
+              <TouchableOpacity
+                style={styles.bigButton}
+                onPress={() => setDeptModalVisible(true)}
+              >
+                <AppText style={styles.bigButtonText}>Create Department</AppText>
+              </TouchableOpacity>
+            </View>
+          ) : (
           <View>
             <AppText variant="h2" style={styles.deptTitle}>
               {department.name}
@@ -429,10 +433,14 @@ const ManageCurriculumScreen = () => {
           </View>
         )}
       </ScrollView>
+      )}
 
       {loading && department && (
         <View style={styles.centeredLoader}>
-           <ActivityIndicator size="large" color={COLORS.primary} />
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <AppText style={{ marginTop: SPACING.m, color: COLORS.textSecondary }}>
+            Updating...
+          </AppText>
         </View>
       )}
 
@@ -846,6 +854,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  centeredLoader: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(241, 245, 249, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
   },
 });
 

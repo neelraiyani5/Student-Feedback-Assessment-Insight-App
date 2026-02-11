@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity, FlatList, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 
 import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
-import { getFacultyAssessments, deleteAssessment, updateAssessment, getMyCourseAssignments, getMyProfile } from '../../services/api';
+import { getFacultyAssessments, deleteAssessment, updateAssessment, getDashboardSummary, getMyProfile } from '../../services/api';
 
 const TABS = ['IA', 'CSE', 'ESE', 'TW'];
 
@@ -17,25 +17,27 @@ const AssessmentListScreen = () => {
     const [assessments, setAssessments] = useState([]);
     const [selectedAssignment, setSelectedAssignment] = useState(null);
     const [activeTab, setActiveTab] = useState('IA');
+    const [assessmentLoading, setAssessmentLoading] = useState(false);
 
     // Edit State
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     const [editForm, setEditForm] = useState({ title: '', maxMarks: '' });
 
-    useEffect(() => {
-        fetchInitialData();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            fetchInitialData();
+            if (selectedAssignment) {
+                fetchAssessments();
+            }
+        }, [selectedAssignment])
+    );
 
     const fetchInitialData = async () => {
-        setLoading(true);
+        if (assignments.length === 0) setLoading(true);
         try {
-            const [assignmentsData, assessmentsData] = await Promise.all([
-                getMyCourseAssignments(),
-                getFacultyAssessments()
-            ]);
-            setAssignments(assignmentsData || []);
-            setAssessments(assessmentsData.assessments || []);
+            const data = await getDashboardSummary();
+            setAssignments(data.myAssignments || []);
         } catch (error) {
             console.log("Error fetching assessment data", error);
         } finally {
@@ -43,13 +45,22 @@ const AssessmentListScreen = () => {
         }
     };
 
+    useEffect(() => {
+        if (selectedAssignment) {
+            fetchAssessments();
+        }
+    }, [selectedAssignment]);
+
     const fetchAssessments = async () => {
-        // Just refresh assessments
+        if (!selectedAssignment) return;
+        if (assessments.length === 0) setAssessmentLoading(true);
         try {
-            const data = await getFacultyAssessments();
+            const data = await getFacultyAssessments(selectedAssignment.subjectId, selectedAssignment.classId);
             setAssessments(data.assessments || []);
         } catch (error) {
             console.log("Error refreshing assessments", error);
+        } finally {
+            setAssessmentLoading(false);
         }
     };
 
@@ -108,17 +119,6 @@ const AssessmentListScreen = () => {
         a.classId === selectedAssignment.classId
     );
 
-    if (loading) {
-        return (
-            <ScreenWrapper backgroundColor={COLORS.surfaceLight}>
-                <View style={[styles.centered, { flex: 1 }]}>
-                    <ActivityIndicator size="large" color={COLORS.primary} />
-                    <AppText style={{ marginTop: 12 }}>Loading...</AppText>
-                </View>
-            </ScreenWrapper>
-        );
-    }
-
     if (!selectedAssignment) {
         return (
             <ScreenWrapper backgroundColor={COLORS.surfaceLight}>
@@ -129,33 +129,40 @@ const AssessmentListScreen = () => {
                     <AppText variant="h3">Select Subject</AppText>
                 </View>
 
-                <FlatList
-                    data={assignments}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={styles.listContent}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity
-                            style={styles.subjectCard}
-                            onPress={() => setSelectedAssignment(item)}
-                        >
-                            <View style={styles.subjectIcon}>
-                                <Ionicons name="book" size={24} color={COLORS.white} />
+                {loading ? (
+                    <View style={[styles.centered, { flex: 1 }]}>
+                        <ActivityIndicator size="large" color={COLORS.primary} />
+                        <AppText style={{ marginTop: 12 }}>Loading subjects...</AppText>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={assignments}
+                        keyExtractor={item => item.id}
+                        contentContainerStyle={styles.listContent}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={styles.subjectCard}
+                                onPress={() => setSelectedAssignment(item)}
+                            >
+                                <View style={styles.subjectIcon}>
+                                    <Ionicons name="book" size={24} color={COLORS.white} />
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 12 }}>
+                                    <AppText style={styles.subjectName}>{item.subject.name}</AppText>
+                                    <AppText variant="caption" color={COLORS.textSecondary}>
+                                        Class: {item.class.name}
+                                    </AppText>
+                                </View>
+                                <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+                            </TouchableOpacity>
+                        )}
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <AppText style={styles.emptyText}>No subjects assigned to you.</AppText>
                             </View>
-                            <View style={{ flex: 1, marginLeft: 12 }}>
-                                <AppText style={styles.subjectName}>{item.subject.name}</AppText>
-                                <AppText variant="caption" color={COLORS.textSecondary}>
-                                    Class: {item.class.name}
-                                </AppText>
-                            </View>
-                            <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
-                        </TouchableOpacity>
-                    )}
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <AppText style={styles.emptyText}>No subjects assigned to you.</AppText>
-                        </View>
-                    }
-                />
+                        }
+                    />
+                )}
             </ScreenWrapper>
         );
     }
@@ -185,48 +192,55 @@ const AssessmentListScreen = () => {
                 ))}
             </View>
 
-            <FlatList
-                data={filteredAssessments}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
-                renderItem={({ item }) => (
-                    <View style={styles.card}>
-                        <TouchableOpacity
-                            onPress={() => router.push(`/assessment/${item.id}`)}
-                            style={styles.cardHeader}
-                        >
-                            <View style={{ flex: 1 }}>
-                                <AppText style={styles.assessmentTitle}>{item.title}</AppText>
-                                <AppText variant="caption" style={styles.detailText}>
-                                    Max Marks: {item.maxMarks}
-                                </AppText>
-                            </View>
-                            <View style={styles.marksBadge}>
-                                <AppText style={styles.marksText}>{item.maxMarks} Marks</AppText>
-                            </View>
-                        </TouchableOpacity>
+            {assessmentLoading ? (
+                <View style={[styles.centered, { flex: 1 }]}>
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                    <AppText variant="caption" style={{ marginTop: 8 }}>Loading assessments...</AppText>
+                </View>
+            ) : (
+                <FlatList
+                    data={filteredAssessments}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styles.listContent}
+                    renderItem={({ item }) => (
+                        <View style={styles.card}>
+                            <TouchableOpacity
+                                onPress={() => router.push(`/assessment/${item.id}`)}
+                                style={styles.cardHeader}
+                            >
+                                <View style={{ flex: 1 }}>
+                                    <AppText style={styles.assessmentTitle}>{item.title}</AppText>
+                                    <AppText variant="caption" style={styles.detailText}>
+                                        Max Marks: {item.maxMarks}
+                                    </AppText>
+                                </View>
+                                <View style={styles.marksBadge}>
+                                    <AppText style={styles.marksText}>{item.maxMarks} Marks</AppText>
+                                </View>
+                            </TouchableOpacity>
 
-                        <View style={styles.cardFooter}>
-                            <AppText variant="caption" style={{ color: COLORS.textLight }}>
-                                Created: {new Date(item.createdAt).toLocaleDateString()}
-                            </AppText>
-                            <View style={{ flexDirection: 'row', gap: 16 }}>
-                                <TouchableOpacity onPress={() => openEditModal(item)}>
-                                    <Ionicons name="pencil" size={20} color={COLORS.textSecondary} />
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={() => handleDeleteAssessment(item)}>
-                                    <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-                                </TouchableOpacity>
+                            <View style={styles.cardFooter}>
+                                <AppText variant="caption" style={{ color: COLORS.textLight }}>
+                                    Created: {new Date(item.createdAt).toLocaleDateString()}
+                                </AppText>
+                                <View style={{ flexDirection: 'row', gap: 16 }}>
+                                    <TouchableOpacity onPress={() => openEditModal(item)}>
+                                        <Ionicons name="pencil" size={20} color={COLORS.textSecondary} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => handleDeleteAssessment(item)}>
+                                        <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
-                    </View>
-                )}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <AppText style={styles.emptyText}>No {activeTab} assessments found.</AppText>
-                    </View>
-                }
-            />
+                    )}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <AppText style={styles.emptyText}>No {activeTab} assessments found.</AppText>
+                        </View>
+                    }
+                />
+            )}
 
             <TouchableOpacity
                 style={styles.fab}

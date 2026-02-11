@@ -7,7 +7,7 @@ import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
 import { wp, hp } from '../../utils/responsive';
-import { getMyProfile } from '../../services/api';
+import { getMyProfile, getSubjects } from '../../services/api';
 
 // Mock Student Data for the visual pool
 const STUDENT_POOL = [
@@ -23,6 +23,7 @@ const CreateFeedbackSession = () => {
     const router = useRouter();
     
     // State
+    const [loading, setLoading] = useState(true);
     const [mySubjects, setMySubjects] = useState([]);
     const [selectedSubject, setSelectedSubject] = useState(null);
     const [date, setDate] = useState('Today, Oct 15'); // Keep static for now
@@ -36,13 +37,25 @@ const CreateFeedbackSession = () => {
     }, []);
 
     const fetchData = async () => {
+        setLoading(true);
         try {
             const data = await getMyProfile();
-            if (data.user && data.user.subjects) {
+            
+            if (data.user?.role === 'CC') {
+                try {
+                    const subjectsData = await getSubjects();
+                    setMySubjects(subjectsData?.subjects || []);
+                } catch (e) {
+                    console.error("Failed to fetch class subjects", e);
+                    setMySubjects(data.user?.subjects || []);
+                }
+            } else if (data.user && data.user.subjects) {
                 setMySubjects(data.user.subjects);
             }
         } catch (error) {
             console.log("Error fetching profile", error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -61,7 +74,14 @@ const CreateFeedbackSession = () => {
                 <AppText variant="h2" style={styles.headerTitle}>Create Feedback Session</AppText>
             </View>
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            {loading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <AppText style={{marginTop: 12, color: COLORS.textSecondary}}>Loading details...</AppText>
+                </View>
+            ) : (
+                <>
+                <ScrollView contentContainerStyle={styles.scrollContent}>
                 
                 {/* Form Section */}
                 <View style={styles.card}>
@@ -135,14 +155,15 @@ const CreateFeedbackSession = () => {
                     </TouchableOpacity>
                 </View>
 
-            </ScrollView>
-
-            {/* Bottom Button */}
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.generateButton} onPress={() => console.log('Generate', {selectedSubject, topic})}>
-                    <AppText style={styles.generateButtonText}>Generate Feedback Request</AppText>
-                </TouchableOpacity>
-            </View>
+                </ScrollView>
+                
+                <View style={styles.footer}>
+                    <TouchableOpacity style={styles.generateButton} onPress={() => console.log('Generate', {selectedSubject, topic})}>
+                        <AppText style={styles.generateButtonText}>Generate Feedback Request</AppText>
+                    </TouchableOpacity>
+                </View>
+                </>
+            )}
 
             {/* Subject Selection Modal */}
             <Modal visible={subjectModalVisible} transparent animationType="slide">
@@ -185,6 +206,11 @@ const CreateFeedbackSession = () => {
 };
 
 const styles = StyleSheet.create({
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     header: {
         backgroundColor: COLORS.white,
         paddingHorizontal: SPACING.l,
