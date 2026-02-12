@@ -11,6 +11,15 @@ import {
   deleteSubject,
   assignFacultyToSubject,
 } from "../controllers/subjectController.js";
+import { 
+    uploadSyllabus, 
+    getSyllabus, 
+    updateChapter, 
+    deleteChapter, 
+    updateTopic, 
+    deleteTopic 
+} from "../controllers/syllabusController.js";
+import upload from "../middlewares/multer.js";
 import validate from "../middlewares/validate.js";
 
 const router = express.Router();
@@ -119,6 +128,50 @@ router.patch(
   assignFacultyToSubjectValidation,
   validate,
   assignFacultyToSubject,
+);
+
+// Syllabus Routes
+router.post(
+  "/:subjectId/syllabus/upload",
+  auth,
+  role("HOD", "CC", "FACULTY"),
+  upload.single("file"),
+  uploadSyllabus
+);
+
+router.get(
+  "/:subjectId/syllabus",
+  auth,
+  getSyllabus
+);
+
+// Edit Syllabus
+router.patch(
+    "/syllabus/chapter/:chapterId",
+    auth,
+    role("HOD", "CC", "FACULTY"),
+    updateChapter
+);
+
+router.delete(
+    "/syllabus/chapter/:chapterId",
+    auth,
+    role("HOD", "CC", "FACULTY"),
+    deleteChapter
+);
+
+router.patch(
+    "/syllabus/topic/:topicId",
+    auth,
+    role("HOD", "CC", "FACULTY"),
+    updateTopic
+);
+
+router.delete(
+    "/syllabus/topic/:topicId",
+    auth,
+    role("HOD", "CC", "FACULTY"),
+    deleteTopic
 );
 
 export default router;

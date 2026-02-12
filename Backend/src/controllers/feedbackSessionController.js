@@ -48,7 +48,8 @@ export const startFeedbackSession = async (req, res) => {
                 classId,
                 subjectId,
                 assignedStudentIds: selectedStudents,
-                expiresAt
+                expiresAt,
+                topicIds: req.body.topicIds || []
             }
         });
 
@@ -79,6 +80,7 @@ export const getStudentSessions = async (req, res) => {
         const studentId = req.user.id;
         const now = new Date();
 
+        // 1. Fetch sessions without the massive syllabus include
         const sessions = await prisma.feedbackSession.findMany({
             where: {
                 assignedStudentIds: { has: studentId },
@@ -96,7 +98,30 @@ export const getStudentSessions = async (req, res) => {
             }
         });
 
-        res.status(200).json(sessions);
+        if (sessions.length === 0) return res.status(200).json([]);
+
+        // 2. Fetch only the TOPICS that are actually assigned to these sessions
+        const allTargetTopicIds = sessions.flatMap(s => s.topicIds);
+        const specificTopics = await prisma.topic.findMany({
+            where: { id: { in: allTargetTopicIds } },
+            select: { id: true, name: true }
+        });
+
+        const topicsMap = Object.fromEntries(specificTopics.map(t => [t.id, t]));
+
+        // 3. Map topics back to sessions
+        const formattedSessions = sessions.map(session => {
+            const sessionTopics = session.topicIds
+                .map(id => topicsMap[id])
+                .filter(Boolean);
+            
+            return {
+                ...session,
+                topics: sessionTopics
+            };
+        });
+
+        res.status(200).json(formattedSessions);
     } catch (error) {
         console.error("Error fetching student sessions:", error);
         res.status(500).json({ message: "Failed to fetch sessions" });
@@ -215,4 +240,50 @@ export const getAllSessions = async (req, res) => {
         console.error("Error fetching all sessions:", error);
         res.status(500).json({ message: "Failed to fetch sessions" });
     }
+};
+
+export const getSessionById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const role = req.user.role;
+
+        const session = await prisma.feedbackSession.findUnique({
+            where: { id },
+            include: {
+                template: true,
+                faculty: { select: { name: true } },
+                subject: { select: { name: true } }
+            }
+        });
+
+        if (!session) return res.status(404).json({ message: "Session not found" });
+
+        // Security check for students
+        if (role === 'STUDENT' && !session.assignedStudentIds.includes(userId)) {
+            return res.status(403).json({ message: "Not assigned to this session" });
+        }
+
+        const specificTopics = await prisma.topic.findMany({
+            where: { id: { in: session.topicIds } },
+            select: { id: true, name: true }
+        });
+
+        res.status(200).json({
+            ...session,
+            topics: specificTopics
+        });
+    } catch (error) {
+        console.error("Error fetching session by ID:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export default {
+    startFeedbackSession,
+    getStudentSessions,
+    submitFeedback,
+    getSessionResponses,
+    getAllSessions,
+    getSessionById
 };

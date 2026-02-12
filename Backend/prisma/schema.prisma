@@ -87,6 +87,8 @@ model FeedbackSession {
   expiresAt    DateTime // Set to end of the day
   createdAt    DateTime @default(now())
   
+  topicIds     String[] @db.ObjectId // Selected topics derived from syllabus
+  
   responses    FeedbackResponse[]
 
   @@index([expiresAt])
@@ -229,8 +231,27 @@ model Subject {
   feedbackSessions FeedbackSession[]
   courseFileAssignments CourseFileAssignment[]
   createdAt  DateTime @default(now())
+  chapters   Chapter[]
 
   @@unique([name, semesterId], name: "name_semesterId")
+}
+
+model Chapter {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  number    Int?
+  title     String
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  subjectId String   @db.ObjectId
+  topics    Topic[]
+  createdAt DateTime @default(now())
+}
+
+model Topic {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  chapterId String   @db.ObjectId
+  createdAt DateTime @default(now())
 }
 
 

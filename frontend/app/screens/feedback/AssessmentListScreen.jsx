@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity, FlatList, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
-import { getFacultyAssessments, deleteAssessment, updateAssessment, getDashboardSummary, getMyProfile } from '../../services/api';
+import { getFacultyAssessments, deleteAssessment, updateAssessment, getDashboardSummary, getMyProfile, getClassSubjects } from '../../services/api';
 
 const TABS = ['IA', 'CSE', 'ESE', 'TW'];
 
 const AssessmentListScreen = () => {
     const router = useRouter();
+    const params = useLocalSearchParams();
     const [loading, setLoading] = useState(true);
     const [assignments, setAssignments] = useState([]);
     const [assessments, setAssessments] = useState([]);
@@ -30,14 +31,36 @@ const AssessmentListScreen = () => {
             if (selectedAssignment) {
                 fetchAssessments();
             }
-        }, [selectedAssignment])
+        }, [selectedAssignment, params.classId, params.subjectId])
     );
 
     const fetchInitialData = async () => {
         if (assignments.length === 0) setLoading(true);
         try {
-            const data = await getDashboardSummary();
-            setAssignments(data.myAssignments || []);
+            let list = [];
+            if (params.classId) {
+                // If viewing a specific class (HOD/CC flow), show all subjects of that class
+                const subData = await getClassSubjects(params.classId);
+                list = (subData?.subjects || []).map(s => ({
+                    id: `temp-${s.id}`, // Unique ID for list
+                    subjectId: s.id,
+                    classId: params.classId,
+                    subject: { name: s.name },
+                    class: { name: params.className || "Selected Class" }
+                }));
+            } else {
+                // Default Faculty flow: show subjects they teach
+                const data = await getDashboardSummary();
+                list = data.myAssignments || [];
+            }
+            
+            setAssignments(list);
+
+            // Auto-select subject if passed in params
+            if (params.subjectId && !selectedAssignment) {
+                const auto = list.find(a => a.subjectId === params.subjectId);
+                if (auto) setSelectedAssignment(auto);
+            }
         } catch (error) {
             console.log("Error fetching assessment data", error);
         } finally {

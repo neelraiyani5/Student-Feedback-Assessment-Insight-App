@@ -147,6 +147,13 @@ const ManageSubjectsScreen = () => {
         }
     };
 
+    const handleSubjectPress = (subject) => {
+        router.push({
+            pathname: "/hod-subject-details",
+            params: { subjectId: subject.id, subjectName: subject.name }
+        });
+    };
+
     return (
         <ScreenWrapper backgroundColor={COLORS.surfaceLight}>
              <View style={styles.header}>
@@ -170,7 +177,7 @@ const ManageSubjectsScreen = () => {
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.listContent}
                     renderItem={({ item }) => (
-                        <View style={styles.card}>
+                        <TouchableOpacity style={styles.card} onPress={() => handleSubjectPress(item)}>
                             <View style={styles.cardHeader}>
                                 <View style={{flexDirection:'row', alignItems:'center', gap: 8}}>
                                     <Ionicons name="book-outline" size={20} color={COLORS.primary} />
@@ -203,7 +210,7 @@ const ManageSubjectsScreen = () => {
                                     <AppText style={styles.assignBtnText}>Assign</AppText>
                                 </TouchableOpacity>
                             </View>
-                        </View>
+                        </TouchableOpacity>
                     )}
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>

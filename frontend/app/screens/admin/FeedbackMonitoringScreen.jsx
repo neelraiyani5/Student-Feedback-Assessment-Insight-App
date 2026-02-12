@@ -34,14 +34,14 @@ const FeedbackMonitoringScreen = () => {
             onPress={() => router.push(`/feedback/monitoring/${item.id}`)}
         >
             <View style={styles.cardHeader}>
-                <View>
-                    <AppText style={styles.title}>{item.title}</AppText>
+                <View style={{flex: 1, paddingRight: 8}}>
+                    <AppText style={styles.title} numberOfLines={2}>{item.title}</AppText>
                     <AppText variant="caption" style={styles.subtitle}>
                         {item.class?.name} • {item.subject?.name}
                     </AppText>
                 </View>
-                <View style={styles.badge}>
-                    <AppText style={styles.badgeText}>{item._count?.responses || 0} Responses</AppText>
+                <View style={[styles.badge, { marginLeft: 'auto' }]}>
+                    <AppText style={styles.badgeText}>{item._count?.responses || 0} Resp.</AppText>
                 </View>
             </View>
             

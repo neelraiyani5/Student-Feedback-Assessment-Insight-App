@@ -93,6 +93,22 @@ const FacultyCourseFileScreen = () => {
             {completed} of {total} items completed
           </AppText>
         </View>
+
+        <View style={styles.cardActions}>
+            <TouchableOpacity 
+                style={styles.syllabusBtn}
+                onPress={(e) => {
+                    e.stopPropagation();
+                    router.push({
+                        pathname: "/hod-subject-details",
+                        params: { subjectId: assignment.subject.id, subjectName: assignment.subject.name }
+                    });
+                }}
+            >
+                <Ionicons name="book-outline" size={18} color={COLORS.primary} />
+                <AppText style={styles.syllabusBtnText}>Manage Syllabus</AppText>
+            </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -244,6 +260,23 @@ const styles = StyleSheet.create({
   },
   taskCount: {
     color: COLORS.textLight,
+  },
+  cardActions: {
+    marginTop: SPACING.m,
+    paddingTop: SPACING.m,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.surface,
+  },
+  syllabusBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  syllabusBtnText: {
+    color: COLORS.primary,
+    fontWeight: '600',
+    fontSize: 14,
   },
   emptyIconContainer: {
     marginBottom: SPACING.l,

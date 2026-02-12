@@ -164,7 +164,7 @@ export const getDashboardSummary = async (req, res) => {
             summaryStats.compliance = summaryStats.totalCount > 0 ? Math.round((summaryStats.completedCount / summaryStats.totalCount) * 100) : 0;
         } 
         else if (userRole === 'STUDENT') {
-            const [studentSubjects, sessions] = await Promise.all([
+            const [studentSubjects, sessions, classStudents] = await Promise.all([
                 prisma.subject.findMany({
                     where: { semester: { classes: { some: { id: user.classId } } } },
                     select: { id: true, name: true }
@@ -177,10 +177,36 @@ export const getDashboardSummary = async (req, res) => {
                         expiresAt: { gt: new Date() }
                     },
                     select: { id: true }
+                }),
+                prisma.user.findMany({
+                    where: { classId: user.classId, role: 'STUDENT' },
+                    select: {
+                        id: true,
+                        marks: {
+                            select: {
+                                marksObtained: true
+                            }
+                        }
+                    }
                 })
             ]);
+
+            // Calculate total marks for each student in the class to determine rank
+            const studentPerformances = classStudents.map(s => {
+                const totalMarks = s.marks.reduce((sum, m) => sum + m.marksObtained, 0);
+                return { id: s.id, totalMarks };
+            });
+
+            // Sort by total marks descending
+            studentPerformances.sort((a, b) => b.totalMarks - a.totalMarks);
+
+            // Find current student's rank (1-indexed)
+            const myRank = studentPerformances.findIndex(p => p.id === userId) + 1;
+
             monitoringData = studentSubjects;
             summaryStats.pendingFeedbackCount = sessions.length;
+            summaryStats.overallRank = myRank || 0;
+            summaryStats.totalStudents = classStudents.length;
         }
 
         res.status(200).json({

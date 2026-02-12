@@ -1,5 +1,5 @@
-import CreateFeedbackSession from "./screens/feedback/CreateFeedbackSession";
-
+import StartSessionScreen from "./screens/feedback/StartSessionScreen";
+ 
 export default function Page() {
-  return <CreateFeedbackSession />;
+  return <StartSessionScreen />;
 }

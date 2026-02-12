@@ -6,7 +6,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
-import { getStudentSessions, submitFeedback } from '../../services/api';
+import { getFeedbackSessionById, submitFeedback } from '../../services/api';
 
 const GiveFeedbackScreen = () => {
     const router = useRouter();
@@ -25,11 +25,7 @@ const GiveFeedbackScreen = () => {
     const fetchSessionDetails = async () => {
         setLoading(true);
         try {
-            // Re-fetch all active sessions and find this one.
-            // A dedicated getSessionById endpoint would be better but this works for now given endpoint limitations.
-            const sessions = await getStudentSessions();
-            const found = sessions.find(s => s.id === id);
-            
+            const found = await getFeedbackSessionById(id);
             if (found) {
                 setSession(found);
             } else {
@@ -56,31 +52,32 @@ const GiveFeedbackScreen = () => {
         if (!session) return;
         
         // Validation: All questions answered?
-        const qCount = session.template.questions.length;
-        if (Object.keys(answers).length < qCount) {
-             Alert.alert("Incomplete", "Please answer all questions before submitting.");
+        const templateCount = session.template.questions.length;
+        const topicCount = session.topics?.length || 0;
+        const totalExpected = templateCount + topicCount;
+
+        if (Object.keys(answers).length < totalExpected) {
+             Alert.alert("Incomplete", "Please answer all questions, including syllabus coverage, before submitting.");
              return;
         }
 
         setSubmitting(true);
         try {
-            // Format answers for backend if needed. Backend usually expects JSON/Map.
-            // Schema says `answers` is Json. 
-            // We'll send array of objects or just the map object.
-            // Let's send the object: { "0": "Strongly Agree", "1": "Neutral" ... }
-            // Or better: { "Question Text": "Answer" } ?
-            // The prompt says "view all answers submitted". 
-            // Typically we store Question + Answer pair to be safe against template changes.
-            // Or just store Q Index + Answer. 
-            // Let's store: { questionIdOrIndex: answer } or array format.
-            // Backend `submitFeedback` takes `answers` (JSON).
-            
-            // Let's restructure answers to be clear:
-            // [ { question: "Q text", answer: "Option" }, ... ]
+            // Standard questions
             const formattedAnswers = session.template.questions.map((q, i) => ({
                 question: q.question,
                 answer: answers[i]
             }));
+
+            // Topic questions
+            if (session.topics) {
+                session.topics.forEach(topic => {
+                    formattedAnswers.push({
+                        question: `Is topic covered: ${topic.name}`,
+                        answer: answers[`topic_${topic.id}`]
+                    });
+                });
+            }
 
             await submitFeedback({
                 sessionId: session.id,
@@ -153,6 +150,44 @@ const GiveFeedbackScreen = () => {
                         </View>
                     </View>
                 ))}
+
+                {/* Topic Coverage Questions */}
+                {session.topics && session.topics.length > 0 && (
+                    <>
+                        <View style={styles.sectionDivider}>
+                            <AppText variant="h3" color={COLORS.primary}>Syllabus Coverage</AppText>
+                            <AppText variant="small" color={COLORS.textSecondary}>Was this topic covered in the lecture?</AppText>
+                        </View>
+
+                        {session.topics.map((topic, index) => {
+                            const qKey = `topic_${topic.id}`;
+                            const isSelected = (val) => answers[qKey] === val;
+                            return (
+                                <View key={topic.id} style={styles.questionCard}>
+                                    <AppText style={styles.questionText}>Is the topic "{topic.name}" actually covered?</AppText>
+                                    
+                                    <View style={styles.boolContainer}>
+                                        <TouchableOpacity 
+                                            style={[styles.boolBtn, isSelected('Yes') && styles.boolBtnYes]}
+                                            onPress={() => handleOptionSelect(qKey, 'Yes')}
+                                        >
+                                            <Ionicons name="checkmark-circle" size={20} color={isSelected('Yes') ? COLORS.white : '#4ADE80'} />
+                                            <AppText style={[styles.boolBtnText, isSelected('Yes') && {color: COLORS.white}]}>Yes</AppText>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity 
+                                            style={[styles.boolBtn, isSelected('No') && styles.boolBtnNo]}
+                                            onPress={() => handleOptionSelect(qKey, 'No')}
+                                        >
+                                            <Ionicons name="close-circle" size={20} color={isSelected('No') ? COLORS.white : '#F87171'} />
+                                            <AppText style={[styles.boolBtnText, isSelected('No') && {color: COLORS.white}]}>No</AppText>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            );
+                        })}
+                    </>
+                )}
 
                 <TouchableOpacity 
                     style={[styles.submitButton, submitting && {opacity: 0.7}]}
@@ -282,6 +317,41 @@ const styles = StyleSheet.create({
         color: COLORS.white,
         fontWeight: 'bold',
         fontSize: 16
+    },
+    sectionDivider: {
+        marginTop: SPACING.l,
+        marginBottom: SPACING.m,
+        paddingHorizontal: SPACING.xs
+    },
+    boolContainer: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 4
+    },
+    boolBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        backgroundColor: COLORS.surface,
+        gap: 8
+    },
+    boolBtnYes: {
+        backgroundColor: '#4ADE80',
+        borderColor: '#4ADE80'
+    },
+    boolBtnNo: {
+        backgroundColor: '#F87171',
+        borderColor: '#F87171'
+    },
+    boolBtnText: {
+        fontWeight: '600',
+        fontSize: 15,
+        color: COLORS.textPrimary
     }
 });
 

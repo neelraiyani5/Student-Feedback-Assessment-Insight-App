@@ -4,7 +4,8 @@ import {
     getStudentSessions,
     submitFeedback,
     getSessionResponses,
-    getAllSessions
+    getAllSessions,
+    getSessionById
 } from "../controllers/feedbackSessionController.js";
 import auth from "../middlewares/auth.js";
 import role from "../middlewares/role.js";
@@ -24,6 +25,9 @@ router.post("/submit", role("STUDENT"), submitFeedback);
 
 // List all sessions (Monitoring)
 router.get("/list", role("HOD", "CC", "FACULTY"), getAllSessions);
+
+// Get specific session
+router.get("/session/:id", getSessionById);
 
 // CC or higher views responses
 router.get("/responses/:sessionId", role("CC", "HOD", "FACULTY"), getSessionResponses);

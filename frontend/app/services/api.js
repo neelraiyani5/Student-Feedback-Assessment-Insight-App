@@ -541,6 +541,15 @@ export const getSessionResponses = async (sessionId) => {
   }
 };
 
+export const getFeedbackSessionById = async (id) => {
+  try {
+    const response = await api.get(`/feedback-session/session/${id}`);
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
 // Course File APIs
 export const getMyCourseAssignments = async () => {
   try {
@@ -733,6 +742,64 @@ export const assignFacultyToClassSubject = async (subjectId, facultyIds) => {
   } catch (error) {
     throw error.response ? error.response.data : error;
   }
+};
+
+export const uploadSyllabus = async (subjectId, formData) => {
+  try {
+    const response = await api.post(`/subject/${subjectId}/syllabus/upload`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const getSyllabus = async (subjectId) => {
+  try {
+     const response = await api.get(`/subject/${subjectId}/syllabus`);
+     return response.data;
+  } catch (error) {
+     throw error.response ? error.response.data : error;
+  }
+};
+
+export const updateChapter = async (chapterId, data) => {
+    try {
+        const response = await api.patch(`/subject/syllabus/chapter/${chapterId}`, data);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error;
+    }
+};
+
+export const deleteChapter = async (chapterId) => {
+    try {
+        const response = await api.delete(`/subject/syllabus/chapter/${chapterId}`);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error;
+    }
+};
+
+export const updateTopic = async (topicId, data) => {
+    try {
+        const response = await api.patch(`/subject/syllabus/topic/${topicId}`, data);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error;
+    }
+};
+
+export const deleteTopic = async (topicId) => {
+    try {
+        const response = await api.delete(`/subject/syllabus/topic/${topicId}`);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error;
+    }
 };
 
 export default api;

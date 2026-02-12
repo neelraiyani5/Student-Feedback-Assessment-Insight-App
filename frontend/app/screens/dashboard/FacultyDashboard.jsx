@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, FlatList, RefreshControl } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
@@ -16,7 +16,7 @@ const FacultyDashboard = () => {
     const [user, setUser] = useState(null);
     const [courseAssignments, setCourseAssignments] = useState([]);
     const [upcomingTasks, setUpcomingTasks] = useState([]); // Dynamic Deadlines
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
 
@@ -33,7 +33,18 @@ const FacultyDashboard = () => {
             if (data.user) {
                 setUser(data.user);
                 if (data.user.subjects) {
-                    const formatted = data.user.subjects.map((s, index) => ({
+                    // Use a Map to ensure unique subject IDs
+                    const uniqueSubjects = [];
+                    const seenIds = new Set();
+                    
+                    data.user.subjects.forEach(s => {
+                        if (!seenIds.has(s.id)) {
+                            uniqueSubjects.push(s);
+                            seenIds.add(s.id);
+                        }
+                    });
+
+                    const formatted = uniqueSubjects.map((s, index) => ({
                         id: s.id,
                         name: s.name,
                         code: s.name.substring(0, 4).toUpperCase(),
@@ -76,6 +87,17 @@ const FacultyDashboard = () => {
         setRefreshing(true);
         fetchDashboardData(true);
     }, []);
+
+    if (loading && !refreshing) {
+        return (
+            <ScreenWrapper backgroundColor={COLORS.surfaceLight}>
+                <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <AppText style={{marginTop: SPACING.m, color: COLORS.textSecondary}}>Loading Dashboard...</AppText>
+                </View>
+            </ScreenWrapper>
+        );
+    }
 
     return (
         <ScreenWrapper backgroundColor={COLORS.surfaceLight} withPadding={false}>
@@ -121,25 +143,44 @@ const FacultyDashboard = () => {
 
                 {/* Assessments Section */}
                 <View style={styles.section}>
-                    <View style={{paddingHorizontal: SPACING.l, marginBottom: SPACING.m}}>
-                        <AppText variant="h3">Assessments</AppText>
+                    <View style={{paddingHorizontal: SPACING.l, marginBottom: SPACING.m, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+                        <AppText variant="h3">My Subjects</AppText>
+                        <AppText variant="caption" style={{color: COLORS.textSecondary}}>Manage Syllabus</AppText>
                     </View>
-                    <TouchableOpacity 
-                        style={[styles.taskCard, {borderColor: COLORS.primary}]}
-                        onPress={() => router.push('/assessments')}
-                    >
-                         <View style={{flexDirection:'row', alignItems:'center', gap: 12}}>
-                             <View style={{padding:8, backgroundColor: COLORS.primary+'20', borderRadius:8}}>
-                                <Ionicons name="clipboard" size={24} color={COLORS.primary} />
-                             </View>
-                             <View style={{flex: 1}}>
-                                 <AppText style={{fontSize:16, fontWeight:'600'}}>Review & Add Marks</AppText>
-                                 <AppText variant="caption" style={{color: COLORS.textSecondary}}>Manage IA, CSE, and ESE marks</AppText>
-                             </View>
-                             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
-                         </View>
-                    </TouchableOpacity>
+                    
+                    {subjects.length > 0 ? (
+                        <ScrollView 
+                            horizontal 
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.subjectsList}
+                        >
+                            {subjects.map((item) => (
+                                <TouchableOpacity 
+                                    key={item.id}
+                                    style={[styles.subjectCard, { backgroundColor: item.color }]} 
+                                    onPress={() => router.push({
+                                        pathname: "/hod-subject-details",
+                                        params: { subjectId: item.id, subjectName: item.name }
+                                    })}
+                                >
+                                    <View style={styles.subjectIconContainer}>
+                                        <Ionicons name={item.icon} size={24} color={COLORS.white} />
+                                    </View>
+                                    <View>
+                                        <AppText variant="h3" style={styles.subjectName}>{item.name}</AppText>
+                                        <AppText variant="caption" style={styles.subjectCode}>{item.code}</AppText>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    ) : (
+                        <View style={{paddingHorizontal: SPACING.l}}>
+                            <AppText style={{color: COLORS.textSecondary, fontStyle:'italic'}}>No subjects assigned.</AppText>
+                        </View>
+                    )}
                 </View>
+
+                {/* Assessments Section */}
 
                 {/* Feedback Section */}
                 <View style={styles.section}>

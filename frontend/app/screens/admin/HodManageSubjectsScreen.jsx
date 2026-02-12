@@ -216,6 +216,16 @@ const HodManageSubjectsScreen = () => {
     }
   };
 
+  const handleSubjectPress = (subject) => {
+    router.push({
+      pathname: "/hod-subject-details",
+      params: { 
+        subjectId: subject.id, 
+        subjectName: subject.name 
+      }
+    });
+  };
+
   const toggleFacultySelection = (facultyId) => {
     setSelectedFacultyIds((prev) =>
       prev.includes(facultyId)
@@ -426,7 +436,10 @@ const HodManageSubjectsScreen = () => {
                 keyExtractor={(item) => item.id.toString()}
                 scrollEnabled={false}
                 renderItem={({ item: subject }) => (
-                  <View style={styles.subjectCard}>
+                  <TouchableOpacity 
+                    style={styles.subjectCard}
+                    onPress={() => handleSubjectPress(subject)}
+                  >
                     <View style={{ flex: 1, marginRight: SPACING.m }}>
                       <AppText style={styles.subjectName}>
                         {subject.name}
@@ -473,7 +486,7 @@ const HodManageSubjectsScreen = () => {
                         <Ionicons name="trash" size={18} color={COLORS.error} />
                       </TouchableOpacity>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 )}
               />
             )}

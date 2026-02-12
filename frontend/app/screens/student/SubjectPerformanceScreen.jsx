@@ -6,7 +6,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
-import { wp } from '../../utils/responsive';
+import { wp, hp } from '../../utils/responsive';
 import { getStudentSubjectPerformance, getStudentSubjects } from '../../services/api';
 
 const SubjectPerformanceScreen = () => {
@@ -16,25 +16,25 @@ const SubjectPerformanceScreen = () => {
     const [performance, setPerformance] = useState(null);
     const [subjectName, setSubjectName] = useState('Subject Analysis');
 
+    // Drill-down state
+    const [selectedComponentKey, setSelectedComponentKey] = useState(null);
+    const [selectedAssessment, setSelectedAssessment] = useState(null);
+    const [showAssessmentsModal, setShowAssessmentsModal] = useState(false);
+    const [showMetricsModal, setShowMetricsModal] = useState(false);
+
     useEffect(() => {
-        // Fetch subject name separately or pass it. 
-        // For now, we assume we might need to fetch subjects again to get name or just use generic title.
-        // Or performance API return subject name? It currently doesn't.
-        // Let's fetch list and find name for better UX.
         fetchData();
     }, [id]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Parallel fetch
             const [perfData, subData] = await Promise.all([
                 getStudentSubjectPerformance(id),
                 getStudentSubjects()
             ]);
 
             setPerformance(perfData);
-
             const sub = subData.subjects?.find(s => s.id === id);
             if (sub) setSubjectName(sub.name);
 
@@ -45,25 +45,35 @@ const SubjectPerformanceScreen = () => {
         }
     };
 
-    const renderProgressBar = (value, total, color) => {
-        const percentage = total > 0 ? (value / total) * 100 : 0;
-        return (
-            <View style={styles.progressContainer}>
-                <View style={[styles.progressBar, { width: `${percentage}%`, backgroundColor: color }]} />
-            </View>
-        );
-    }
+    const handleComponentPress = (key) => {
+        setSelectedComponentKey(key);
+        setShowAssessmentsModal(true);
+    };
+
+    const handleAssessmentPress = (ass) => {
+        setSelectedAssessment(ass);
+        setShowMetricsModal(true);
+    };
 
     if (loading) {
         return (
             <ScreenWrapper backgroundColor={COLORS.surfaceLight}>
-                <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} />
+                <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <AppText style={{marginTop: 12}}>Analyzing performance...</AppText>
+                </View>
             </ScreenWrapper>
         );
     }
 
-    /* Logic for Comparison */
-    // performance: { rank, totalStudents, totalObtained, classAverage, components: { IA: {scored, total}, ... } }
+    const COMPONENT_STYLES = {
+        IA: { label: 'Internal', bg: '#DBEAFE', color: '#1E40AF' },
+        CSE: { label: 'CSE', bg: '#DCFCE7', color: '#166534' },
+        ESE: { label: 'End Sem', bg: '#F3E8FF', color: '#6B21A8' },
+        TW: { label: 'Term Work', bg: '#FEF3C7', color: '#92400E' }
+    };
+
+    const selectedComponentData = selectedComponentKey ? performance?.components[selectedComponentKey] : null;
 
     return (
         <ScreenWrapper backgroundColor={COLORS.surfaceLight} withPadding={false}>
@@ -109,16 +119,13 @@ const SubjectPerformanceScreen = () => {
 
                     <View style={{ marginTop: 16 }}>
                         <AppText variant="caption" style={{ marginBottom: 8 }}>Performance Meter</AppText>
-                        {/* Mock Visual representation */}
                         <View style={styles.meterContainer}>
                             <View style={[styles.meterBar, {
-                                width: `${(performance?.totalObtained / (performance?.components?.IA?.total * 3 || 100)) * 100}%`
-                                // Ideally total marks should be summed from assessment max. 
-                                // But bar logic is purely visual for now.
+                                width: `${Math.min(100, (performance?.totalObtained / (performance?.classAverage * 1.5 || 100)) * 100)}%`
                             }]} />
                         </View>
                         <AppText variant="small" style={{ textAlign: 'right', marginTop: 4, color: COLORS.textSecondary }}>
-                            {performance?.totalObtained > performance?.classAverage ? "Above Average" : "Needs Improvement"}
+                            {performance?.totalObtained >= performance?.classAverage ? "Above Average" : "Needs Improvement"}
                         </AppText>
                     </View>
                 </View>
@@ -126,61 +133,151 @@ const SubjectPerformanceScreen = () => {
                 {/* Component Breakdown */}
                 <View style={styles.sectionTitleRow}>
                     <AppText variant="h3">Component Breakdown</AppText>
+                    <AppText variant="caption" style={{color: COLORS.textSecondary}}>Tap to view assessments</AppText>
                 </View>
 
                 <View style={styles.grid}>
-                    {/* IA */}
-                    <View style={styles.componentCard}>
-                        <View style={[styles.iconBg, { backgroundColor: '#DBEAFE' }]}>
-                            <AppText style={{ fontWeight: 'bold', color: '#1E40AF' }}>IA</AppText>
-                        </View>
-                        <AppText style={styles.compTitle}>Internal</AppText>
-                        <AppText style={styles.scoreText}>
-                            {performance?.components?.IA?.scored} <AppText variant="small" style={{ color: COLORS.textSecondary }}>/ {performance?.components?.IA?.total}</AppText>
-                        </AppText>
-                    </View>
-
-                    {/* CSE */}
-                    <View style={styles.componentCard}>
-                        <View style={[styles.iconBg, { backgroundColor: '#DCFCE7' }]}>
-                            <AppText style={{ fontWeight: 'bold', color: '#166534' }}>CSE</AppText>
-                        </View>
-                        <AppText style={styles.compTitle}>CSE</AppText>
-                        <AppText style={styles.scoreText}>
-                            {performance?.components?.CSE?.scored} <AppText variant="small" style={{ color: COLORS.textSecondary }}>/ {performance?.components?.CSE?.total}</AppText>
-                        </AppText>
-                    </View>
-
-                    {/* ESE */}
-                    <View style={styles.componentCard}>
-                        <View style={[styles.iconBg, { backgroundColor: '#F3E8FF' }]}>
-                            <AppText style={{ fontWeight: 'bold', color: '#6B21A8' }}>ESE</AppText>
-                        </View>
-                        <AppText style={styles.compTitle}>End Sem</AppText>
-                        <AppText style={styles.scoreText}>
-                            {performance?.components?.ESE?.scored} <AppText variant="small" style={{ color: COLORS.textSecondary }}>/ {performance?.components?.ESE?.total}</AppText>
-                        </AppText>
-                    </View>
-
-                    {/* TW */}
-                    <View style={styles.componentCard}>
-                        <View style={[styles.iconBg, { backgroundColor: '#FEF3C7' }]}>
-                            <AppText style={{ fontWeight: 'bold', color: '#92400E' }}>TW</AppText>
-                        </View>
-                        <AppText style={styles.compTitle}>Term Work</AppText>
-                        <AppText style={styles.scoreText}>
-                            {performance?.components?.TW?.scored || 0} <AppText variant="small" style={{ color: COLORS.textSecondary }}>/ {performance?.components?.TW?.total || 0}</AppText>
-                        </AppText>
-                    </View>
+                    {Object.keys(COMPONENT_STYLES).map((key) => {
+                        const style = COMPONENT_STYLES[key];
+                        const data = performance?.components[key];
+                        return (
+                            <TouchableOpacity 
+                                key={key} 
+                                style={styles.componentCard}
+                                onPress={() => handleComponentPress(key)}
+                            >
+                                <View style={[styles.iconBg, { backgroundColor: style.bg }]}>
+                                    <AppText style={{ fontWeight: 'bold', color: style.color }}>{key}</AppText>
+                                </View>
+                                <AppText style={styles.compTitle}>{style.label}</AppText>
+                                <AppText style={styles.scoreText}>
+                                    {data?.scored || 0} <AppText variant="small" style={{ color: COLORS.textSecondary }}>/ {data?.total || 0}</AppText>
+                                </AppText>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
 
-                {/* Detailed Analysis (Coming Soon placeholder) */}
-                <View style={[styles.card, { marginTop: SPACING.l, alignItems: 'center', paddingVertical: 30 }]}>
-                    <Ionicons name="analytics" size={40} color={COLORS.textLight} />
-                    <AppText style={{ marginTop: 10, color: COLORS.textSecondary }}>Detailed question-wise analysis coming soon.</AppText>
+                {/* Detailed Analysis Callout */}
+                <View style={[styles.card, { marginTop: SPACING.l, padding: SPACING.m, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F9FF', borderColor: '#BAE6FD', borderWidth: 1 }]}>
+                    <Ionicons name="information-circle" size={24} color="#0284C7" />
+                    <AppText style={{ marginLeft: 10, flex: 1, color: '#0369A1' }}>Click on any component above to see individual assessment marks and class stats.</AppText>
                 </View>
 
             </ScrollView>
+
+            {/* Assessments List Modal */}
+            {showAssessmentsModal && (
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <AppText variant="h3">{COMPONENT_STYLES[selectedComponentKey]?.label} Assessments</AppText>
+                            <TouchableOpacity onPress={() => setShowAssessmentsModal(false)}>
+                                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+                            </TouchableOpacity>
+                        </View>
+                        
+                        <ScrollView style={{maxHeight: hp(60)}}>
+                            {selectedComponentData?.assessments?.length > 0 ? (
+                                selectedComponentData.assessments.map((ass) => (
+                                    <TouchableOpacity 
+                                        key={ass.id} 
+                                        style={styles.assessmentItem}
+                                        onPress={() => handleAssessmentPress(ass)}
+                                    >
+                                        <View style={{flex: 1}}>
+                                            <AppText style={styles.assessmentTitle}>{ass.title}</AppText>
+                                            <AppText variant="caption" style={{color: COLORS.textSecondary}}>Max Marks: {ass.maxMarks}</AppText>
+                                        </View>
+                                        <View style={styles.marksBadge}>
+                                            <AppText style={styles.marksBadgeText}>{ass.ownMarks}</AppText>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={18} color={COLORS.textLight} />
+                                    </TouchableOpacity>
+                                ))
+                            ) : (
+                                <View style={{paddingVertical: 30, alignItems: 'center'}}>
+                                    <AppText style={{color: COLORS.textSecondary}}>No assessments found in this category.</AppText>
+                                </View>
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            )}
+
+            {/* Detailed Metrics Modal */}
+            {showMetricsModal && (
+                <View style={[styles.modalOverlay, {backgroundColor: 'rgba(0,0,0,0.7)'}]}>
+                    <View style={[styles.modalContent, {paddingBottom: 20, maxHeight: hp(85)}]}>
+                         <View style={styles.modalHeader}>
+                            <AppText variant="h3">Performance Details</AppText>
+                            <TouchableOpacity onPress={() => setShowMetricsModal(false)}>
+                                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <AppText style={styles.metricAssTitle}>{selectedAssessment?.title}</AppText>
+                            
+                            {/* Unified Grid using explicit rows to guarantee layout */}
+                            <View style={{gap: SPACING.m, marginBottom: SPACING.l}}>
+                                <View style={{flexDirection: 'row', gap: SPACING.m}}>
+                                    <View style={[styles.metricCard, {backgroundColor: COLORS.primary + '15'}]}>
+                                        <AppText variant="caption" style={{color: COLORS.primary, fontWeight: '600'}}>Your Mark</AppText>
+                                        <AppText style={[styles.metricValue, {color: COLORS.primary}]}>{selectedAssessment?.ownMarks}</AppText>
+                                        <AppText variant="small" style={{color: COLORS.textSecondary}}>/{selectedAssessment?.maxMarks}</AppText>
+                                    </View>
+
+                                    <View style={[styles.metricCard, {backgroundColor: '#FEF3C7'}]}>
+                                        <AppText variant="caption" style={{color: '#92400E', fontWeight: '600'}}>Class Mean</AppText>
+                                        <AppText style={[styles.metricValue, {color: '#92400E'}]}>{selectedAssessment?.mean}</AppText>
+                                        <AppText variant="small" style={{color: COLORS.textSecondary}}>Average</AppText>
+                                    </View>
+                                </View>
+
+                                <View style={{flexDirection: 'row', gap: SPACING.m}}>
+                                    <View style={[styles.metricCard, {backgroundColor: '#DCFCE7'}]}>
+                                        <AppText variant="caption" style={{color: '#166534', fontWeight: '600'}}>Highest</AppText>
+                                        <AppText style={[styles.metricValue, {color: '#166534'}]}>{selectedAssessment?.highest}</AppText>
+                                        <AppText variant="small" style={{color: COLORS.textSecondary}}>Top Score</AppText>
+                                    </View>
+
+                                    <View style={[styles.metricCard, {backgroundColor: '#FEE2E2'}]}>
+                                        <AppText variant="caption" style={{color: '#991B1B', fontWeight: '600'}}>Lowest</AppText>
+                                        <AppText style={[styles.metricValue, {color: '#991B1B'}]}>{selectedAssessment?.lowest}</AppText>
+                                        <AppText variant="small" style={{color: COLORS.textSecondary}}>Min Score</AppText>
+                                    </View>
+                                </View>
+                            </View>
+
+                            <View style={styles.metricSummary}>
+                                <View style={[styles.summaryIndicator, { backgroundColor: selectedAssessment?.ownMarks >= selectedAssessment?.mean ? COLORS.success : COLORS.error }]}>
+                                    <Ionicons 
+                                        name={selectedAssessment?.ownMarks >= selectedAssessment?.mean ? "trending-up" : "trending-down"} 
+                                        size={20} 
+                                        color={COLORS.white} 
+                                    />
+                                </View>
+                                <View style={{marginLeft: 12, flex: 1}}>
+                                    <AppText style={{fontWeight: '700', fontSize: 16, color: COLORS.textPrimary}}>
+                                        {selectedAssessment?.ownMarks >= selectedAssessment?.mean ? "Great Job!" : "Needs Improvement"}
+                                    </AppText>
+                                    <AppText variant="caption" style={{color: COLORS.textSecondary, marginTop: 2}}>
+                                        Your score is {Math.abs(selectedAssessment?.ownMarks - selectedAssessment?.mean).toFixed(1)} marks {selectedAssessment?.ownMarks >= selectedAssessment?.mean ? "above" : "below"} the class average.
+                                    </AppText>
+                                </View>
+                            </View>
+
+                            <TouchableOpacity 
+                                style={styles.modalDoneBtn} 
+                                onPress={() => setShowMetricsModal(false)}
+                            >
+                                <AppText style={styles.modalDoneBtnText}>Dismiss</AppText>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </View>
+            )}
         </ScreenWrapper>
     );
 };
@@ -289,6 +386,119 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         color: COLORS.textPrimary
+    },
+    // Modal Styles
+    modalOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+        zIndex: 1000
+    },
+    modalContent: {
+        backgroundColor: COLORS.white,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: SPACING.l,
+        paddingBottom: 40,
+        width: '100%',
+        elevation: 10
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: SPACING.l,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+        paddingBottom: SPACING.m
+    },
+    assessmentItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: SPACING.m,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.surface,
+        gap: SPACING.m
+    },
+    assessmentTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: COLORS.textPrimary,
+        marginBottom: 2
+    },
+    marksBadge: {
+        backgroundColor: COLORS.primary + '15',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        minWidth: 40,
+        alignItems: 'center'
+    },
+    marksBadgeText: {
+        color: COLORS.primary,
+        fontWeight: 'bold',
+        fontSize: 16
+    },
+    metricAssTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+        marginBottom: SPACING.l,
+        textAlign: 'center'
+    },
+    metricsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: SPACING.m,
+        marginBottom: SPACING.l
+    },
+    metricCard: {
+        flex: 1,
+        minWidth: '45%',
+        padding: SPACING.m,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    metricValue: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        marginVertical: 4
+    },
+    metricSummary: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: SPACING.m,
+        backgroundColor: COLORS.surface,
+        borderRadius: 16,
+        marginBottom: SPACING.l,
+        borderWidth: 1,
+        borderColor: COLORS.border
+    },
+    summaryIndicator: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 2
+    },
+    modalDoneBtn: {
+        backgroundColor: COLORS.primary,
+        padding: SPACING.m,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: SPACING.s
+    },
+    modalDoneBtnText: {
+        color: COLORS.white,
+        fontWeight: 'bold',
+        fontSize: 16
     }
 });
 

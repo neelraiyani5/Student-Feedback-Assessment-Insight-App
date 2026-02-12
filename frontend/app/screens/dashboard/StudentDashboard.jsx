@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -15,20 +15,39 @@ const StudentDashboard = () => {
     const { name } = useLocalSearchParams();
     const [subjects, setSubjects] = useState([]);
     const [pendingFeedbackCount, setPendingFeedbackCount] = useState(0);
+    const [overallRank, setOverallRank] = useState(null);
+    const [totalStudents, setTotalStudents] = useState(0);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchData();
     }, []);
 
     const fetchData = async () => {
+        setLoading(true);
         try {
             const data = await getDashboardSummary();
             setSubjects(data.monitoringData || []);
             setPendingFeedbackCount(data.summaryStats.pendingFeedbackCount || 0);
+            setOverallRank(data.summaryStats.overallRank || 0);
+            setTotalStudents(data.summaryStats.totalStudents || 0);
         } catch (error) {
             console.log("Error fetching dashboard data", error);
+        } finally {
+            setLoading(false);
         }
     };
+
+    if (loading) {
+        return (
+            <ScreenWrapper backgroundColor={COLORS.surfaceLight}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <AppText style={{ marginTop: 12 }}>Loading your dashboard...</AppText>
+                </View>
+            </ScreenWrapper>
+        );
+    }
 
     return (
         <ScreenWrapper backgroundColor={COLORS.surfaceLight} withPadding={false}>
@@ -80,7 +99,14 @@ const StudentDashboard = () => {
                             <Ionicons name="trophy" size={20} color="#2563EB" />
                         </View>
                         <AppText variant="caption" style={{ color: '#2563EB' }}>Overall Rank</AppText>
-                        <AppText variant="h2" style={{ color: '#1E3A8A', marginTop: SPACING.xs }}>-</AppText>
+                        <AppText variant="h2" style={{ color: '#1E3A8A', marginTop: SPACING.xs }}>
+                            {overallRank ? `#${overallRank}` : 'N/A'}
+                        </AppText>
+                        {totalStudents > 0 && (
+                            <AppText variant="small" style={{ color: '#2563EB', opacity: 0.7 }}>
+                                Out of {totalStudents}
+                            </AppText>
+                        )}
                     </TouchableOpacity >
                 </View>
 
@@ -213,11 +239,11 @@ const styles = StyleSheet.create({
     },
     statCard: {
         flex: 1,
-        padding: SPACING.l,
+        padding: SPACING.m,
         borderRadius: LAYOUT.radius.xl,
         alignItems: 'flex-start',
         justifyContent: 'center',
-        height: 120
+        minHeight: 130
     },
     statIconBg: {
         backgroundColor: 'rgba(255,255,255,0.5)',
@@ -256,6 +282,11 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: COLORS.textPrimary,
         marginBottom: 4,
+    },
+    loadingContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center'
     }
 });
 

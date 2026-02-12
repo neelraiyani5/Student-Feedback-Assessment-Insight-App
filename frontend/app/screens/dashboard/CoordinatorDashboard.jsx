@@ -369,6 +369,32 @@ const CoordinatorDashboard = () => {
                   </View>
                 </TouchableOpacity>
 
+                <TouchableOpacity
+                  style={styles.adminCard}
+                  onPress={() => router.push("/hod-insights-selection")}
+                >
+                  <View
+                    style={[
+                      styles.adminIconContainer,
+                      { backgroundColor: COLORS.success },
+                    ]}
+                  >
+                    <Ionicons
+                      name="analytics"
+                      size={24}
+                      color={COLORS.white}
+                    />
+                  </View>
+                  <View style={styles.adminContent}>
+                    <AppText style={styles.adminTitle}>
+                      Class Insights
+                    </AppText>
+                    <AppText variant="caption" style={styles.adminSubtitle}>
+                      Marks Analysis
+                    </AppText>
+                  </View>
+                </TouchableOpacity>
+
                 {myAssignments.length > 0 && (
                   <>
                     <TouchableOpacity
@@ -486,6 +512,32 @@ const CoordinatorDashboard = () => {
                     <AppText style={styles.adminTitle}>Feedback Reports</AppText>
                     <AppText variant="caption" style={styles.adminSubtitle}>
                       View Results
+                    </AppText>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.adminCard}
+                  onPress={() => router.push("/class-insights")}
+                >
+                  <View
+                    style={[
+                      styles.adminIconContainer,
+                      { backgroundColor: COLORS.success }, 
+                    ]}
+                  >
+                    <Ionicons
+                      name="analytics"
+                      size={24}
+                      color={COLORS.white}
+                    />
+                  </View>
+                  <View style={styles.adminContent}>
+                    <AppText style={styles.adminTitle}>
+                      Class Insights
+                    </AppText>
+                    <AppText variant="caption" style={styles.adminSubtitle}>
+                      Marks Analysis
                     </AppText>
                   </View>
                 </TouchableOpacity>
@@ -616,14 +668,38 @@ const CoordinatorDashboard = () => {
                             ]} 
                           />
                         </View>
-                        <AppText variant="caption" style={{ color: COLORS.textSecondary, marginTop: 4 }}>
-                          Progress: {item.progress || 0}%
-                        </AppText>
+                        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4}}>
+                            <AppText variant="caption" style={{ color: COLORS.textSecondary }}>
+                            Progress: {item.progress || 0}%
+                            </AppText>
+                            <TouchableOpacity 
+                                onPress={() => router.push({
+                                    pathname: "/hod-subject-details",
+                                    params: { subjectId: item.subjectId, subjectName: item.name }
+                                })}
+                                style={{flexDirection: 'row', alignItems: 'center', gap: 4}}
+                            >
+                                <Ionicons name="book-outline" size={14} color={COLORS.primary} />
+                                <AppText variant="caption" style={{color: COLORS.primary, fontWeight: '700'}}>Syllabus</AppText>
+                            </TouchableOpacity>
+                        </View>
                       </View>
                     ) : (
-                      <AppText variant="caption" style={{ color: COLORS.error, marginTop: 4 }}>
-                        Not Assigned - Setup Required
-                      </AppText>
+                      <View style={{ marginTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                         <AppText variant="caption" style={{ color: COLORS.error }}>
+                            Not Assigned - Setup Required
+                        </AppText>
+                         <TouchableOpacity 
+                                onPress={() => router.push({
+                                    pathname: "/hod-subject-details",
+                                    params: { subjectId: item.subjectId, subjectName: item.name }
+                                })}
+                                style={{flexDirection: 'row', alignItems: 'center', gap: 4}}
+                            >
+                                <Ionicons name="book-outline" size={14} color={COLORS.primary} />
+                                <AppText variant="caption" style={{color: COLORS.primary, fontWeight: '700'}}>Syllabus</AppText>
+                            </TouchableOpacity>
+                      </View>
                     )}
                   </View>
                   <Ionicons

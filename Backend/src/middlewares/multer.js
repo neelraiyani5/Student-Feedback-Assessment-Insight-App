@@ -19,24 +19,25 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-    const filetypes = /xlsx|xls|csv/;
+    const filetypes = /xlsx|xls|csv|pdf/;
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = filetypes.test(file.mimetype) ||
         file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
         file.mimetype === 'application/vnd.ms-excel' ||
-        file.mimetype === 'text/csv';
+        file.mimetype === 'text/csv' || 
+        file.mimetype === 'application/pdf';
 
     if (mimetype && extname) {
         return cb(null, true);
     } else {
-        cb(new Error("Only Excel files (.xlsx, .xls or .csv) are allowed!"));
+        cb(new Error("Only Excel (.xlsx, .xls) and PDF files are allowed!"));
     }
 };
 
 const upload = multer({
     storage: storage,
     fileFilter: fileFilter,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
 export default upload;

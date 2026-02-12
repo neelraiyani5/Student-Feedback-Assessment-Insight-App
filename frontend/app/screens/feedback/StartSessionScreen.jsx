@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, FONTS, SPACING, LAYOUT } from '../../constants/theme';
-import { getTemplates, getSubjectClasses, startFeedbackSession, getMyProfile, getSubjects } from '../../services/api';
+import { getTemplates, getSubjectClasses, startFeedbackSession, getMyProfile, getSubjects, getSyllabus, getMyCourseAssignments, getDepartmentCourseAssignments } from '../../services/api';
 
 const StartSessionScreen = () => {
     const router = useRouter();
@@ -24,12 +24,21 @@ const StartSessionScreen = () => {
     const [selectedSubject, setSelectedSubject] = useState(null);
     const [selectedClass, setSelectedClass] = useState(null);
     
+    // Syllabus Selection
+    const [chapters, setChapters] = useState([]);
+    const [selectedChapter, setSelectedChapter] = useState(null);
+    const [selectedTopics, setSelectedTopics] = useState([]);
+    const [loadingSyllabus, setLoadingSyllabus] = useState(false);
+    
     // UI Helpers for Dropdowns
     const [showTemps, setShowTemps] = useState(false);
     const [showSubs, setShowSubs] = useState(false);
     const [showClasses, setShowClasses] = useState(false);
+    const [showChapters, setShowChapters] = useState(false);
+    const [showTopics, setShowTopics] = useState(false);
 
     const [submitting, setSubmitting] = useState(false);
+    const [coordinatedClassId, setCoordinatedClassId] = useState(null);
 
     useEffect(() => {
         fetchInitialData();
@@ -38,24 +47,62 @@ const StartSessionScreen = () => {
     const fetchInitialData = async () => {
         setLoading(true);
         try {
-            const [tmplData, userData] = await Promise.all([
+            const [tmplData, profileData] = await Promise.all([
                 getTemplates(),
                 getMyProfile()
             ]);
             setTemplates(tmplData || []);
+            const user = profileData?.user;
+
+            let subjectsList = [];
             
-            // For CCs, show all subjects in their class
-            // For others, show their assigned subjects
-            if (userData.user?.role === 'CC') {
-                try {
-                    const subjectsData = await getSubjects();
-                    setSubjects(subjectsData?.subjects || []);
-                } catch (e) {
-                    console.error("Failed to fetch class subjects", e);
-                    setSubjects(userData.user?.subjects || []);
+            if (user?.role === 'CC') {
+                const classCoord = user.classesCoordinated?.[0];
+                if (classCoord) {
+                    setCoordinatedClassId(classCoord.id);
+                    setSelectedClass(classCoord); // Pre-select for CC
+                    try {
+                        const subjectsData = await getSubjects();
+                        subjectsList = (subjectsData?.subjects || []).map(s => ({
+                            ...s,
+                            subjectId: s.id,
+                            display: s.name
+                        }));
+                    } catch (e) { console.error("CC subjects fetch error", e); }
                 }
-            } else {
-                setSubjects(userData.user?.subjects || []);
+            } else if (user?.role === 'FACULTY') {
+                try {
+                    const assignments = await getMyCourseAssignments();
+                    subjectsList = assignments.map(a => ({
+                        id: a.subjectId, 
+                        subjectId: a.subjectId,
+                        classId: a.classId,
+                        name: a.subject.name,
+                        display: `${a.subject.name} (${a.class.name})`,
+                        className: a.class.name,
+                        rawClass: a.class
+                    }));
+                } catch (e) { console.error("Faculty assignments fetch error", e); }
+            } else if (user?.role === 'HOD') {
+                try {
+                    const assignments = await getDepartmentCourseAssignments();
+                    subjectsList = assignments.map(a => ({
+                        id: a.subjectId,
+                        subjectId: a.subjectId,
+                        classId: a.classId,
+                        name: a.subject.name,
+                        display: `${a.subject.name} (${a.class.name})`,
+                        className: a.class.name,
+                        rawClass: a.class
+                    }));
+                } catch (e) { console.error("HOD assignments fetch error", e); }
+            }
+            
+            setSubjects(subjectsList);
+            
+            // Auto-select first template for convenience
+            if (tmplData && tmplData.length > 0) {
+                setSelectedTemplate(tmplData[0]);
             }
         } catch (error) {
             console.log(error);
@@ -67,26 +114,56 @@ const StartSessionScreen = () => {
 
     const handleSubjectSelect = async (subject) => {
         setSelectedSubject(subject);
-        setSelectedClass(null); // Reset class
+        setSelectedClass(subject.rawClass || null); 
         setShowSubs(false);
         
-        // Fetch classes for this subject
-        setLoadingClasses(true);
+        // Reset syllabus states
+        setChapters([]);
+        setSelectedChapter(null);
+        setSelectedTopics([]);
+
+        // 1. Fetch classes for this subject if not already known
+        if (!subject.rawClass) {
+            setLoadingClasses(true);
+            try {
+                const data = await getSubjectClasses(subject.id);
+                setClasses(data?.classes || []);
+            } catch (error) {
+                console.log("Error fetching classes", error);
+            } finally {
+                setLoadingClasses(false);
+            }
+        }
+
+        // 2. Fetch Syllabus (New)
+        setLoadingSyllabus(true);
         try {
-            const data = await getSubjectClasses(subject.id);
-            // data might be array of classes directly or { classes: [] }
-            // API return: res.status(200).json(classes); which is array.
-            setClasses(data?.classes || []);
+            const syllabusId = subject.subjectId || subject.id;
+            const syllabusData = await getSyllabus(syllabusId);
+            setChapters(syllabusData || []);
         } catch (error) {
-            console.log("Error fetching classes", error);
-            Alert.alert("Error", "Failed to fetch classes for this subject");
+            console.log("Syllabus fetch error", error);
         } finally {
-            setLoadingClasses(false);
+            setLoadingSyllabus(false);
+        }
+    };
+
+    const handleChapterSelect = (chapter) => {
+        setSelectedChapter(chapter);
+        setSelectedTopics([]);
+        setShowChapters(false);
+    };
+
+    const handleTopicSelect = (topic) => {
+        if (selectedTopics.find(t => t.id === topic.id)) {
+            setSelectedTopics(selectedTopics.filter(t => t.id !== topic.id));
+        } else {
+            setSelectedTopics([...selectedTopics, topic]);
         }
     };
 
     const handleStartSession = async () => {
-        if (!title.trim()) return Alert.alert("Required", "Please enter a session title");
+        if (!title.trim() && !selectedChapter) return Alert.alert("Required", "Please enter a session title or select a unit/chapter");
         if (!selectedTemplate) return Alert.alert("Required", "Please select a template");
         if (!selectedSubject) return Alert.alert("Required", "Please select a subject");
         if (!selectedClass) return Alert.alert("Required", "Please select a class");
@@ -94,13 +171,14 @@ const StartSessionScreen = () => {
         setSubmitting(true);
         try {
              const payload = {
-                 title,
+                 title: selectedChapter ? `${selectedChapter.title}: ${selectedTopics.map(t => t.name).join(', ')}` : title,
                  templateId: selectedTemplate.id,
-                 subjectId: selectedSubject.id,
-                 classId: selectedClass.id
+                 subjectId: selectedSubject.subjectId || selectedSubject.id,
+                 classId: selectedClass.id,
+                 topicIds: selectedTopics.map(t => t.id)
              };
              await startFeedbackSession(payload);
-             Alert.alert("Success", "Feedback session started! 3-2-1 strategy applied.", [
+             Alert.alert("Success", "Feedback session started successfully!", [
                  { text: "OK", onPress: () => router.back() } 
              ]);
         } catch (error) {
@@ -178,14 +256,95 @@ const StartSessionScreen = () => {
                     {renderDropdown(templates, setSelectedTemplate, selectedTemplate, showTemps, setShowTemps, 'title', 'Select Template')}
 
                     <AppText style={styles.label}>Select Subject</AppText>
-                    {renderDropdown(subjects, handleSubjectSelect, selectedSubject, showSubs, setShowSubs, 'name', 'Select Subject')}
+                    {renderDropdown(subjects, handleSubjectSelect, selectedSubject, showSubs, setShowSubs, 'display', 'Select Subject')}
 
-                    <AppText style={styles.label}>Select Class</AppText>
-                    {loadingClasses ? (
-                        <ActivityIndicator size="small" color={COLORS.primary} style={{alignSelf:'flex-start', marginBottom: 16}} />
+                    {coordinatedClassId ? (
+                        <View style={styles.infoBoxSmall}>
+                            <AppText variant="caption">Coordinates Class: {selectedClass?.name || 'Class assigned'}</AppText>
+                        </View>
                     ) : (
-                        renderDropdown(classes, setSelectedClass, selectedClass, showClasses, setShowClasses, 'name', 'Select Class')
+                        <>
+                            <AppText style={styles.label}>Select Class</AppText>
+                            {loadingClasses ? (
+                                <ActivityIndicator size="small" color={COLORS.primary} style={{alignSelf:'flex-start', marginBottom: 16}} />
+                            ) : (
+                                renderDropdown(classes, setSelectedClass, selectedClass, showClasses, setShowClasses, 'name', 'Select Class')
+                            )}
+                        </>
                     )}
+
+                    <AppText style={styles.label}>Unit / Chapter</AppText>
+                    <View style={{marginBottom: 16}}>
+                        <TouchableOpacity 
+                            style={[styles.dropdownTrigger, (!selectedSubject || chapters.length === 0) && { opacity: 0.6 }]} 
+                            onPress={() => chapters.length > 0 && setShowChapters(true)}
+                            disabled={!selectedSubject || loadingSyllabus || chapters.length === 0}
+                        >
+                             <AppText style={{color: selectedChapter ? COLORS.textPrimary : COLORS.textLight}}>
+                                 {loadingSyllabus ? "Loading syllabus..." : 
+                                  chapters.length > 0 ? (selectedChapter ? `Unit ${selectedChapter.number}: ${selectedChapter.title}` : "Select Unit") : 
+                                  selectedSubject ? "No syllabus found" : "Waiting for subject..."}
+                             </AppText>
+                             {loadingSyllabus ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Ionicons name="apps" size={20} color={COLORS.textSecondary} />}
+                        </TouchableOpacity>
+                        
+                        <Modal visible={showChapters} transparent animationType="fade">
+                            <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowChapters(false)}>
+                                <View style={styles.dropdownModal}>
+                                    <ScrollView>
+                                        {chapters.map((item, index) => (
+                                            <TouchableOpacity key={item.id} style={styles.dropdownItem} onPress={() => handleChapterSelect(item)}>
+                                                <AppText>Unit {item.number}: {item.title}</AppText>
+                                                {selectedChapter?.id === item.id && <Ionicons name="checkmark" size={16} color={COLORS.primary}/>}
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            </TouchableOpacity>
+                        </Modal>
+                    </View>
+
+                    <AppText style={styles.label}>Subtopics</AppText>
+                    <View style={{marginBottom: 16}}>
+                        <TouchableOpacity 
+                            style={[styles.dropdownTrigger, !selectedChapter && { opacity: 0.6 }]} 
+                            onPress={() => selectedChapter && setShowTopics(true)}
+                            disabled={!selectedChapter}
+                        >
+                             <View style={{flex: 1, flexDirection: 'row', flexWrap: 'wrap'}}>
+                                 {selectedTopics.length > 0 ? (
+                                     selectedTopics.map(t => (
+                                         <View key={t.id} style={styles.chip}>
+                                             <AppText variant="caption" style={{color: COLORS.primary}}>{t.name}</AppText>
+                                         </View>
+                                     ))
+                                 ) : (
+                                     <AppText style={{color: COLORS.textLight}}>
+                                         {selectedChapter ? "Select Subtopics" : "Select a Unit first"}
+                                     </AppText>
+                                 )}
+                             </View>
+                             <Ionicons name="list" size={20} color={COLORS.textSecondary} />
+                        </TouchableOpacity>
+                        
+                        <Modal visible={showTopics} transparent animationType="fade">
+                            <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowTopics(false)}>
+                                <View style={styles.dropdownModal}>
+                                    <ScrollView>
+                                        {selectedChapter?.topics?.map((item) => (
+                                            <TouchableOpacity key={item.id} style={styles.dropdownItem} onPress={() => handleTopicSelect(item)}>
+                                                <AppText>{item.name}</AppText>
+                                                {selectedTopics.find(t => t.id === item.id) && <Ionicons name="checkbox" size={18} color={COLORS.primary}/>}
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                    <TouchableOpacity style={styles.closeBtn} onPress={() => setShowTopics(false)}>
+                                        <AppText style={{color: COLORS.white, fontWeight:'bold'}}>Done</AppText>
+                                    </TouchableOpacity>
+                                </View>
+                            </TouchableOpacity>
+                        </Modal>
+                    </View>
 
                     <View style={styles.infoBox}>
                          <Ionicons name="information-circle" size={20} color={COLORS.primary} />
@@ -293,6 +452,29 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center'
+    },
+    chip: {
+        backgroundColor: COLORS.primary + '15',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        marginRight: 6,
+        marginBottom: 4
+    },
+    infoBoxSmall: {
+        backgroundColor: COLORS.surface,
+        padding: 10,
+        borderRadius: 8,
+        borderLeftWidth: 3,
+        borderLeftColor: COLORS.primary,
+        marginBottom: 16
+    },
+    closeBtn: {
+        backgroundColor: COLORS.primary,
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        margin: 10
     }
 });
 

@@ -747,25 +747,44 @@ export const getStudentSubjectPerformance = async (req, res) => {
 
     // 3. Components Analysis
     const components = {
-      IA: { scored: 0, total: 0 },
-      CSE: { scored: 0, total: 0 },
-      ESE: { scored: 0, total: 0 },
+      IA: { scored: 0, total: 0, assessments: [] },
+      CSE: { scored: 0, total: 0, assessments: [] },
+      ESE: { scored: 0, total: 0, assessments: [] },
+      TW: { scored: 0, total: 0, assessments: [] },
     };
 
     assessments.forEach((ass) => {
-      const myMark = ass.marks.find((m) => m.studentId === uid);
-      const score = myMark ? myMark.marksObtained : 0;
+      const myMarkRec = ass.marks.find((m) => m.studentId === uid);
+      const myMark = myMarkRec ? myMarkRec.marksObtained : 0;
 
-      if (components[ass.component]) {
-        components[ass.component].scored += score;
-        components[ass.component].total += ass.maxMarks;
-      } else {
-        // Fallback if component name differs or new type
-        if (!components[ass.component])
-          components[ass.component] = { scored: 0, total: 0 };
-        components[ass.component].scored += score;
-        components[ass.component].total += ass.maxMarks;
+      const marksList = ass.marks.map((m) => m.marksObtained);
+      const highest = marksList.length > 0 ? Math.max(...marksList) : 0;
+      const lowest = marksList.length > 0 ? Math.min(...marksList) : 0;
+      const mean =
+        marksList.length > 0
+          ? marksList.reduce((a, b) => a + b, 0) / marksList.length
+          : 0;
+
+      const assessmentDetail = {
+        id: ass.id,
+        title: ass.title,
+        maxMarks: ass.maxMarks,
+        ownMarks: myMark,
+        highest,
+        lowest,
+        mean: Math.round(mean * 100) / 100,
+      };
+
+      if (!components[ass.component]) {
+        components[ass.component] = { scored: 0, total: 0, assessments: [] };
       }
+      if (!components[ass.component].assessments) {
+        components[ass.component].assessments = [];
+      }
+
+      components[ass.component].scored += myMark;
+      components[ass.component].total += ass.maxMarks;
+      components[ass.component].assessments.push(assessmentDetail);
     });
 
     const classTotalScore = sortedScores.reduce((a, b) => a + b, 0);
