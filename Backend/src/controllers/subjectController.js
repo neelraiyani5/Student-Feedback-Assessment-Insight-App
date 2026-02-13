@@ -185,77 +185,90 @@ export const deleteSubject = async (req, res) => {
       return res.status(404).json({ message: "Subject not found" });
     }
 
-    // 1. Get all CourseFileAssignment IDs for this subject
-    const assignments = await prisma.courseFileAssignment.findMany({
-      where: { subjectId },
-      select: { id: true }
-    });
-    const assignmentIds = assignments.map(a => a.id);
-
-    // 2. Delete CourseFileTaskSubmission records first (child of assignments)
-    if (assignmentIds.length > 0) {
-      await prisma.courseFileTaskSubmission.deleteMany({
-        where: { assignmentId: { in: assignmentIds } }
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete syllabus (Chapters and Topics) first to avoid relation issues
+      // First delete all topics belonging to chapters of this subject
+      await tx.topic.deleteMany({
+        where: { chapter: { subjectId } }
       });
-    }
-
-    // 3. Delete course file assignments for this subject
-    await prisma.courseFileAssignment.deleteMany({
-      where: { subjectId },
-    });
-
-    // 4. Delete marks for assessments of this subject
-    await prisma.marks.deleteMany({
-      where: { assessment: { subjectId } }
-    });
-
-    // 5. Delete assessments for this subject
-    await prisma.assessment.deleteMany({
-      where: { subjectId },
-    });
-
-    // 6. Get feedback sessions for this subject
-    const sessions = await prisma.feedbackSession.findMany({
-      where: { subjectId },
-      select: { id: true }
-    });
-    const sessionIds = sessions.map(s => s.id);
-
-    // 7. Delete feedback responses first
-    if (sessionIds.length > 0) {
-      await prisma.feedbackResponse.deleteMany({
-        where: { sessionId: { in: sessionIds } }
+      
+      // Then delete chapters
+      await tx.chapter.deleteMany({
+        where: { subjectId },
       });
-    }
 
-    // 8. Delete feedback sessions for this subject
-    await prisma.feedbackSession.deleteMany({
-      where: { subjectId },
-    });
+      // 2. Get all CourseFileAssignment IDs
+      const assignments = await tx.courseFileAssignment.findMany({
+        where: { subjectId },
+        select: { id: true }
+      });
+      const assignmentIds = assignments.map(a => a.id);
 
-    // 9. Remove subjectId from all faculty members
-    const facultyWithSubject = await prisma.user.findMany({
-      where: { subjectIds: { has: subjectId } }
-    });
-    for (const faculty of facultyWithSubject) {
-      await prisma.user.update({
-        where: { id: faculty.id },
-        data: {
-          subjectIds: {
-            set: faculty.subjectIds.filter(sid => sid !== subjectId)
+      // 3. Delete CourseFileTaskSubmission records
+      if (assignmentIds.length > 0) {
+        await tx.courseFileTaskSubmission.deleteMany({
+          where: { assignmentId: { in: assignmentIds } }
+        });
+      }
+
+      // 4. Delete course file assignments
+      await tx.courseFileAssignment.deleteMany({
+        where: { subjectId },
+      });
+
+      // 5. Delete marks for assessments
+      await tx.marks.deleteMany({
+        where: { assessment: { subjectId } }
+      });
+
+      // 6. Delete assessments
+      await tx.assessment.deleteMany({
+        where: { subjectId },
+      });
+
+      // 7. Get feedback sessions
+      const sessions = await tx.feedbackSession.findMany({
+        where: { subjectId },
+        select: { id: true }
+      });
+      const sessionIds = sessions.map(s => s.id);
+
+      // 8. Delete feedback responses
+      if (sessionIds.length > 0) {
+        await tx.feedbackResponse.deleteMany({
+          where: { sessionId: { in: sessionIds } }
+        });
+      }
+
+      // 9. Delete feedback sessions
+      await tx.feedbackSession.deleteMany({
+        where: { subjectId },
+      });
+
+      // 10. Remove subjectId from all faculty members
+      const facultyWithSubject = await tx.user.findMany({
+        where: { subjectIds: { has: subjectId } }
+      });
+      for (const faculty of facultyWithSubject) {
+        await tx.user.update({
+          where: { id: faculty.id },
+          data: {
+            subjectIds: {
+              set: faculty.subjectIds.filter(sid => sid !== subjectId)
+            }
           }
-        }
-      });
-    }
+        });
+      }
 
-    // 10. Delete subject
-    await prisma.subject.delete({
-      where: { id: subjectId },
+      // 11. Final: Delete the subject
+      await tx.subject.delete({
+        where: { id: subjectId },
+      });
     });
 
     res.status(200).json({ message: "Subject deleted successfully" });
   } catch (error) {
-    console.error(error);
+    console.error("Delete Subject Error:", error);
     res.status(500).json({ message: "Failed to delete subject", error: error.message });
   }
 };

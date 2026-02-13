@@ -31,6 +31,17 @@ export const getFacultyTasks = async (req, res) => {
 export const getAssignmentTasks = async (req, res) => {
   try {
     const { assignmentId } = req.params;
+
+    // Security check: Faculty can only see their own assignments
+    if (req.user.role === 'FACULTY') {
+      const assignment = await prisma.courseFileAssignment.findUnique({
+        where: { id: assignmentId }
+      });
+      if (!assignment || assignment.facultyId !== req.user.id) {
+        return res.status(403).json({ message: "Access denied to this assignment" });
+      }
+    }
+
     const tasks = await prisma.courseFileTaskSubmission.findMany({
       where: { assignmentId },
       include: {
@@ -419,7 +430,7 @@ export const revertTask = async (req, res) => {
        // However, if HOD has reviewed a CC's task, CC cannot revert anymore without HOD's consent 
        // (or HOD reverting first). For simplicity, let's allow it if it's not "locked" strictly.
        
-       if (task.hodStatus !== "PENDING" && !isHod) {
+       if (task.hodStatus !== "PENDING" && !isHod && !isCc) {
          return res.status(400).json({ message: "Task has already been reviewed by HOD and cannot be reverted." });
        }
     }

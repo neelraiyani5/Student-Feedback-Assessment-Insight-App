@@ -7,7 +7,7 @@ import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, SPACING, LAYOUT } from '../../constants/theme';
 import { hp } from '../../utils/responsive';
-import { getCourseTasks, completeCourseTask, revertCourseTask } from '../../services/api';
+import { getCourseTasks, completeCourseTask, revertCourseTask, getMyProfile, getAssignmentTasks } from '../../services/api';
 
 const ChecklistScreen = () => {
     const router = useRouter();
@@ -15,6 +15,7 @@ const ChecklistScreen = () => {
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [assignmentInfo, setAssignmentInfo] = useState({ subject: '', class: '' });
+    const [userRole, setUserRole] = useState(null);
 
     useEffect(() => {
         fetchTasks();
@@ -23,15 +24,20 @@ const ChecklistScreen = () => {
     const fetchTasks = async () => {
         setLoading(true);
         try {
-            const allTasks = await getCourseTasks();
-            // Filter by Assignment
-            const filtered = allTasks.filter(t => t.assignmentId === assignmentId);
-            setTasks(filtered);
+            // Get user profile for role checks if not already fetched
+            if (!userRole) {
+                const profile = await getMyProfile();
+                setUserRole(profile.user.role);
+            }
+
+            // Optimization: Fetch only tasks for the specific assignment instead of all tasks
+            const data = await getAssignmentTasks(assignmentId);
+            setTasks(data);
             
-            if (filtered.length > 0) {
+            if (data.length > 0) {
                 setAssignmentInfo({
-                    subject: filtered[0].assignment.subject.name,
-                    class: filtered[0].assignment.class.name
+                    subject: data[0].assignment.subject.name,
+                    class: data[0].assignment.class.name
                 });
             }
         } catch (error) {
@@ -47,7 +53,11 @@ const ChecklistScreen = () => {
         // If unchecking (Reverting to Pending)
         if (currentStatus === 'COMPLETED' && !isRejected) {
              // Check if already reviewed by HOD (most locked state)
-             if (hodStatus !== 'PENDING') {
+             // EXCEPTION: If the current user IS the HOD or CC, they can revert their OWN tasks 
+             // even if auto-approved because they own the subject.
+             const canRevert = (userRole === 'HOD') || (userRole === 'CC') || (hodStatus === 'PENDING');
+
+             if (!canRevert) {
                 Alert.alert("Locked", "This task has already been reviewed by HOD and cannot be changed.");
                 return;
              }
@@ -175,7 +185,7 @@ const ChecklistScreen = () => {
                                             ios_backgroundColor={COLORS.inputBorder}
                                             onValueChange={() => handleTaskCompletion(task.id, task.status, task.ccStatus, task.hodStatus)}
                                             value={isCompleted}
-                                            disabled={isCompleted && task.hodStatus !== 'PENDING'} 
+                                            disabled={isCompleted && !((userRole === 'HOD') || (userRole === 'CC') || (task.hodStatus === 'PENDING'))} 
                                             style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                                         />
                                     )}

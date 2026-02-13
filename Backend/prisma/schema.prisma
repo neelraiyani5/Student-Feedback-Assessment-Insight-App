@@ -240,7 +240,7 @@ model Chapter {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   number    Int?
   title     String
-  subject   Subject  @relation(fields: [subjectId], references: [id])
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   subjectId String   @db.ObjectId
   topics    Topic[]
   createdAt DateTime @default(now())

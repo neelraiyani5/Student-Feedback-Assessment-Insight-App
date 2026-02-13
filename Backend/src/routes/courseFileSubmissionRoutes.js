@@ -36,7 +36,7 @@ router.patch("/revert/:taskId", role("FACULTY", "CC", "HOD"), revertTask);
 // Review routes (CC and HOD)
 router.get(
   "/assignment/:assignmentId/tasks",
-  role("CC", "HOD"),
+  role("FACULTY", "CC", "HOD"),
   getAssignmentTasks,
 );
 /**

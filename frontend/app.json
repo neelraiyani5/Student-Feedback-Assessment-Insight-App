@@ -17,7 +17,8 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.hit_rachhadiya.Acadone"
     },
     "web": {
       "output": "static",
@@ -41,6 +42,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "28731826-34dd-458e-920a-59666e98cdf0"
+      }
     }
   }
 }
