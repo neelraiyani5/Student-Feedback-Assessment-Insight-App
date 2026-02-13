@@ -2,6 +2,7 @@ import express from "express";
 import {
   getFacultyTasks,
   completeTask,
+  revertTask,
   reviewTask,
   getComplianceAlerts,
   getAssignmentTasks,
@@ -30,6 +31,7 @@ const reviewValidation = [
 // Faculty routes
 router.get("/my-tasks", role("FACULTY", "CC", "HOD"), getFacultyTasks);
 router.patch("/complete/:taskId", role("FACULTY", "CC", "HOD"), completeTask);
+router.patch("/revert/:taskId", role("FACULTY", "CC", "HOD"), revertTask);
 
 // Review routes (CC and HOD)
 router.get(

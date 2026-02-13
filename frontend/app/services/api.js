@@ -7,7 +7,8 @@ import { Platform } from "react-native";
 // For iOS Simulator use 'http://localhost:3002'
 // For Android Emulator use 'http://10.0.2.2:3002'
 // For Physical Device use your machine's IP: 'http://192.168.x.x:3002'
-const BASE_URL = "http://10.132.93.75:3001";
+// const BASE_URL = "https://student-feedback-assessment-insight-app.onrender.com";
+const BASE_URL = "http://10.80.31.67:3001";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -633,6 +634,17 @@ export const completeCourseTask = async (taskId) => {
   try {
     const response = await api.patch(
       `/course-file-submission/complete/${taskId}`,
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const revertCourseTask = async (taskId) => {
+  try {
+    const response = await api.patch(
+      `/course-file-submission/revert/${taskId}`,
     );
     return response.data;
   } catch (error) {

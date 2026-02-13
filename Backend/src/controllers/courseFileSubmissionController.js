@@ -392,6 +392,78 @@ export const completeTask = async (req, res) => {
   }
 };
 
+export const revertTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const facultyId = req.user.id;
+
+    const task = await prisma.courseFileTaskSubmission.findUnique({
+      where: { id: taskId },
+      include: { assignment: true },
+    });
+
+    if (!task || task.assignment.facultyId !== facultyId) {
+      return res
+        .status(403)
+        .json({ message: "Access denied or task not found" });
+    }
+
+    // Check if any review has already been done
+    if (task.ccStatus !== "PENDING" || task.hodStatus !== "PENDING") {
+       // Check if it was CC/HOD themselves who auto-completed it
+       const isHod = req.user.role === 'HOD';
+       const isCc = req.user.role === 'CC';
+       
+       // Even if they are CC/HOD, if it's already "YES" and they want to revert, they should be allowed 
+       // to revert their OWN auto-approvals if they made a mistake marking it as complete.
+       // However, if HOD has reviewed a CC's task, CC cannot revert anymore without HOD's consent 
+       // (or HOD reverting first). For simplicity, let's allow it if it's not "locked" strictly.
+       
+       if (task.hodStatus !== "PENDING" && !isHod) {
+         return res.status(400).json({ message: "Task has already been reviewed by HOD and cannot be reverted." });
+       }
+    }
+
+    const updatedTask = await prisma.courseFileTaskSubmission.update({
+      where: { id: taskId },
+      data: {
+        status: "PENDING",
+        completedAt: null,
+        ccStatus: "PENDING",
+        ccRemarks: null,
+        ccReviewDate: null,
+        hodStatus: "PENDING",
+        hodRemarks: null,
+        hodReviewDate: null
+      },
+      include: {
+        template: { select: { title: true } },
+        assignment: {
+          include: {
+            subject: { select: { name: true } },
+            class: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    await createCourseFileLog({
+      action: "TASK_REVERTED",
+      message: `Faculty reverted task "${updatedTask.template.title}" to PENDING`,
+      user: { id: req.user.id, name: req.user.name },
+      assignmentId: updatedTask.assignmentId,
+      className: updatedTask.assignment.class.name,
+      subjectName: updatedTask.assignment.subject.name,
+      taskTitle: updatedTask.template.title,
+    });
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to revert task" });
+  }
+};
+
 export const reviewTask = async (req, res) => {
   try {
     const { taskId } = req.params;

@@ -7,7 +7,7 @@ import AppText from '../../components/AppText';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { COLORS, SPACING, LAYOUT } from '../../constants/theme';
 import { hp } from '../../utils/responsive';
-import { getCourseTasks, completeCourseTask } from '../../services/api';
+import { getCourseTasks, completeCourseTask, revertCourseTask } from '../../services/api';
 
 const ChecklistScreen = () => {
     const router = useRouter();
@@ -42,26 +42,38 @@ const ChecklistScreen = () => {
     };
 
     const handleTaskCompletion = async (taskId, currentStatus, ccStatus, hodStatus) => {
-        // Allow toggle if Pending OR if Rejected (Returned)
-        // If Completed and NOT Rejected, prevent accidental toggle
         const isRejected = ccStatus === 'NO' || hodStatus === 'NO';
         
+        // If unchecking (Reverting to Pending)
         if (currentStatus === 'COMPLETED' && !isRejected) {
-             Alert.alert("Completed", "This task is already completed.");
+             // Check if already reviewed by HOD (most locked state)
+             if (hodStatus !== 'PENDING') {
+                Alert.alert("Locked", "This task has already been reviewed by HOD and cannot be changed.");
+                return;
+             }
+
+             Alert.alert(
+                "Confirm Undo",
+                "Do you want to mark this task as NOT COMPLETED? This will reset all approvals.",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { 
+                        text: "Yes, Revert", 
+                        onPress: async () => {
+                            try {
+                                setTasks(current => current.map(t => t.id === taskId ? { ...t, processing: true } : t));
+                                await revertCourseTask(taskId);
+                                Alert.alert("Success", "Task status reverted to pending");
+                                fetchTasks();
+                            } catch (error) {
+                                Alert.alert("Error", error.message || "Failed to revert task status");
+                                setTasks(current => current.map(t => t.id === taskId ? { ...t, processing: false } : t));
+                            }
+                        } 
+                    }
+                ]
+             );
              return; 
-        }
-
-        const newStatus = currentStatus === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
-
-        // If Unchecking (Reverting to Pending), strictly verify user intent
-        if (currentStatus === 'COMPLETED') {
-             // Logic to reverting... backend might not support revert yet? 
-             // api.js `completeCourseTask` usually just sets to COMPLETE.
-             // We can implement a revert if needed, but for now let's assume valid forward progress 
-             // IF it is rejected, we assume they are RE-submitting (so sticking to COMPLETE update).
-             // If valid re-submission, they just hit Complete again?
-             // Actually, if it's already COMPLETED in DB, calling complete again updates timestamp.
-             // So if Rejected, we let them click.
         }
 
         Alert.alert(
@@ -78,7 +90,7 @@ const ChecklistScreen = () => {
                             Alert.alert("Success", "Task submitted successfully");
                             fetchTasks();
                         } catch (error) {
-                            Alert.alert("Error", "Failed to update task status");
+                            Alert.alert("Error", error.message || "Failed to update task status");
                             setTasks(current => current.map(t => t.id === taskId ? { ...t, processing: false } : t));
                         }
                     } 
@@ -163,7 +175,7 @@ const ChecklistScreen = () => {
                                             ios_backgroundColor={COLORS.inputBorder}
                                             onValueChange={() => handleTaskCompletion(task.id, task.status, task.ccStatus, task.hodStatus)}
                                             value={isCompleted}
-                                            disabled={isCompleted} 
+                                            disabled={isCompleted && task.hodStatus !== 'PENDING'} 
                                             style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                                         />
                                     )}
