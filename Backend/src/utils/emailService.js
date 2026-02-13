@@ -1,15 +1,21 @@
 import nodemailer from "nodemailer";
+import dns from "dns";
 import dotenv from "dotenv";
 import path from "path";
+
+// Force IPv4 over IPv6 to prevent ENETUNREACH errors on certain networks (like Render)
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
 
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-    host: "smtp.googlemail.com",
+    host: "smtp.gmail.com",
     port: 465,
     secure: true,
     pool: true,
-    family: 4,
+    family: 4, // Explicitly use IPv4
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
