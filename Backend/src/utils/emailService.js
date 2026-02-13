@@ -1,28 +1,20 @@
 import nodemailer from "nodemailer";
-import dns from "dns";
 import dotenv from "dotenv";
-import path from "path";
-
-// Force IPv4 over IPv6 to prevent ENETUNREACH errors on certain networks (like Render)
-if (dns.setDefaultResultOrder) {
-    dns.setDefaultResultOrder('ipv4first');
-}
 
 dotenv.config();
 
+/**
+ * Generic SMTP Transporter
+ * Works with Resend, SendGrid, Brevo, etc.
+ */
 const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    pool: true,
-    family: 4, // Explicitly use IPv4
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT),
+    secure: Number(process.env.SMTP_PORT) === 465,
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
     },
-    connectionTimeout: 30000, // 30 seconds
-    greetingTimeout: 30000,
-    socketTimeout: 30000,
 });
 
 
