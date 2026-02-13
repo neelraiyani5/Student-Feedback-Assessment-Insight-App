@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, View, TouchableOpacity } from "react-native";
+import { StyleSheet, View, TouchableOpacity, Modal, TextInput, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
@@ -28,6 +28,11 @@ const HodSubjectDetailsScreen = () => {
   const [syllabus, setSyllabus] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [userRole, setUserRole] = React.useState(null);
+  
+  // Edit Modal State
+  const [editModalVisible, setEditModalVisible] = React.useState(false);
+  const [editItem, setEditItem] = React.useState(null); // { type: 'chapter' | 'topic', id: string, value: string }
+  const [editValue, setEditValue] = React.useState("");
 
   React.useEffect(() => {
     fetchSyllabus();
@@ -106,73 +111,34 @@ const HodSubjectDetailsScreen = () => {
   };
 
   const handleEditChapter = (chapter) => {
-    Alert.prompt(
-      "Edit Chapter",
-      "Enter new chapter title:",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Update", 
-          onPress: async (newTitle) => {
-            if (!newTitle) return;
-            try {
-              await updateChapter(chapter.id, { title: newTitle });
-              fetchSyllabus();
-            } catch (error) {
-              Alert.alert("Error", "Failed to update chapter");
-            }
-          }
-        }
-      ],
-      "plain-text",
-      chapter.title
-    );
-  };
-
-  const handleDeleteChapter = (chapterId) => {
-    Alert.alert(
-      "Delete Chapter",
-      "Are you sure you want to delete this chapter and all its topics?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteChapter(chapterId);
-              fetchSyllabus();
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete chapter");
-            }
-          }
-        }
-      ]
-    );
+    setEditItem({ type: 'chapter', id: chapter.id, value: chapter.title });
+    setEditValue(chapter.title);
+    setEditModalVisible(true);
   };
 
   const handleEditTopic = (topic) => {
-    Alert.prompt(
-      "Edit Topic",
-      "Enter new topic name:",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Update", 
-          onPress: async (newName) => {
-            if (!newName) return;
-            try {
-              await updateTopic(topic.id, { name: newName });
-              fetchSyllabus();
-            } catch (error) {
-              Alert.alert("Error", "Failed to update topic");
-            }
-          }
+    setEditItem({ type: 'topic', id: topic.id, value: topic.name });
+    setEditValue(topic.name);
+    setEditModalVisible(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editValue.trim() || !editItem) return;
+    
+    try {
+        setLoading(true);
+        if (editItem.type === 'chapter') {
+            await updateChapter(editItem.id, { title: editValue });
+        } else {
+            await updateTopic(editItem.id, { name: editValue });
         }
-      ],
-      "plain-text",
-      topic.name
-    );
+        setEditModalVisible(false);
+        fetchSyllabus();
+    } catch (error) {
+        Alert.alert("Error", `Failed to update ${editItem.type}`);
+    } finally {
+        setLoading(false);
+    }
   };
 
   const handleDeleteTopic = (topicId) => {
@@ -320,6 +286,46 @@ const HodSubjectDetailsScreen = () => {
         </View>
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Cross-platform Edit Modal */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <AppText variant="h3" style={{ marginBottom: SPACING.m }}>
+              Edit {editItem?.type === 'chapter' ? 'Chapter' : 'Topic'}
+            </AppText>
+            
+            <TextInput
+              style={styles.modalInput}
+              value={editValue}
+              onChangeText={setEditValue}
+              placeholder="Enter new value..."
+              autoFocus
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, { backgroundColor: COLORS.surface }]} 
+                onPress={() => setEditModalVisible(false)}
+              >
+                <AppText>Cancel</AppText>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalBtn, { backgroundColor: COLORS.primary }]} 
+                onPress={handleSaveEdit}
+              >
+                <AppText style={{ color: COLORS.white, fontWeight: 'bold' }}>Save</AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenWrapper>
   );
 };
@@ -443,6 +449,40 @@ const styles = StyleSheet.create({
   topicActions: {
     flexDirection: "row",
     gap: SPACING.s,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: SPACING.l,
+  },
+  modalContent: {
+    width: "100%",
+    backgroundColor: COLORS.white,
+    borderRadius: LAYOUT.radius.m,
+    padding: SPACING.l,
+    elevation: 5,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: SPACING.l,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: SPACING.m,
+  },
+  modalBtn: {
+    paddingHorizontal: SPACING.l,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: "center",
   },
 });
 

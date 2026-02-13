@@ -114,7 +114,9 @@ const StartSessionScreen = () => {
 
     const handleSubjectSelect = async (subject) => {
         setSelectedSubject(subject);
-        setSelectedClass(subject.rawClass || null); 
+        if (subject.rawClass) {
+            setSelectedClass(subject.rawClass);
+        }
         setShowSubs(false);
         
         // Reset syllabus states
