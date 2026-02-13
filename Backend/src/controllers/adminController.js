@@ -26,7 +26,14 @@ export const createUser = async (req, res) => {
 
         res.status(201).json({ message: `${role} created successfully and credentials sent to email.`, Credentials: { userId, password: password } })
     } catch (error) {
-        res.status(500).json({ message: "Failed to create user", error });
+        if (error.code === 'P2002') {
+            const field = error.meta?.target || '';
+            const message = field.includes('userId') ? 'UserID already exists' : 
+                          field.includes('email') ? 'Email already exists' : 
+                          'User with these details already exists';
+            return res.status(409).json({ message });
+        }
+        res.status(500).json({ message: "Failed to create user", error: error.message });
     }
 }
 
@@ -113,7 +120,14 @@ export const updateUser = async (req, res) => {
 
         res.status(200).json({ message: "User updated successfully", user: updatedUser });
     } catch (error) {
-        res.status(500).json({ message: "Failed to update user", error });
+        if (error.code === 'P2002') {
+            const field = error.meta?.target || '';
+            const message = field.includes('userId') ? 'UserID already exists' : 
+                          field.includes('email') ? 'Email already exists' : 
+                          'User with these details already exists';
+            return res.status(409).json({ message });
+        }
+        res.status(500).json({ message: "Failed to update user", error: error.message });
     }
 }
 
@@ -161,10 +175,21 @@ export const bulkUploadUsers = async (req, res) => {
             }
 
             try {
-                // Check if user already exists
-                const existingUser = await prisma.user.findUnique({ where: { userId: userid.toString() } });
+                // Check if user already exists (userId or email)
+                const existingUser = await prisma.user.findFirst({ 
+                    where: { 
+                        OR: [
+                            { userId: userid.toString() },
+                            { email: email }
+                        ]
+                    } 
+                });
+                
                 if (existingUser) {
-                    errors.push({ name, userid, error: "User already exists" });
+                    const errorMsg = existingUser.userId === userid.toString() 
+                        ? "UserID already exists" 
+                        : "Email already exists";
+                    errors.push({ name, userid, error: errorMsg });
                     continue;
                 }
 

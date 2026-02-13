@@ -43,9 +43,8 @@ export const createStudent = async (req, res) => {
       where: { OR: [{ email }, { userId }] },
     });
     if (existing) {
-      return res
-        .status(409)
-        .json({ message: "User with email or ID already exists" });
+      const message = existing.userId === userId ? "Student ID already exists" : "Email already exists";
+      return res.status(409).json({ message });
     }
 
     const password = Math.random().toString(36).slice(-8);
@@ -67,6 +66,13 @@ export const createStudent = async (req, res) => {
       Credentials: { userId, password },
     });
   } catch (error) {
+    if (error.code === 'P2002') {
+        const field = error.meta?.target || '';
+        const message = field.includes('userId') ? 'Student ID already exists' : 
+                      field.includes('email') ? 'Email already exists' : 
+                      'Student with these details already exists';
+        return res.status(409).json({ message });
+    }
     res
       .status(500)
       .json({ message: "Failed to create student", error: error.message });
@@ -169,9 +175,8 @@ export const updateStudent = async (req, res) => {
     });
 
     if (existing) {
-      return res
-        .status(409)
-        .json({ message: "Email or Student ID already in use" });
+      const message = existing.userId === userId ? "Student ID already exists" : "Email already exists";
+      return res.status(409).json({ message });
     }
 
     const updatedStudent = await prisma.user.update({
@@ -184,6 +189,13 @@ export const updateStudent = async (req, res) => {
       student: updatedStudent,
     });
   } catch (error) {
+    if (error.code === 'P2002') {
+        const field = error.meta?.target || '';
+        const message = field.includes('userId') ? 'Student ID already exists' : 
+                      field.includes('email') ? 'Email already exists' : 
+                      'Student with these details already exists';
+        return res.status(409).json({ message });
+    }
     res
       .status(500)
       .json({ message: "Failed to update student", error: error.message });
