@@ -345,6 +345,26 @@ const CoordinatorDashboard = () => {
 
                 <TouchableOpacity
                   style={styles.adminCard}
+                  onPress={() => router.push("/timetable")}
+                >
+                  <View
+                    style={[
+                      styles.adminIconContainer,
+                      { backgroundColor: "#6366F1" }, // Indigo for timetable
+                    ]}
+                  >
+                    <Ionicons name="calendar" size={24} color={COLORS.white} />
+                  </View>
+                  <View style={styles.adminContent}>
+                    <AppText style={styles.adminTitle}>Timetable</AppText>
+                    <AppText variant="caption" style={styles.adminSubtitle}>
+                      Manage & Search
+                    </AppText>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.adminCard}
                   onPress={() => router.push("/hod-course-file-review")}
                 >
                   <View
@@ -541,6 +561,7 @@ const CoordinatorDashboard = () => {
                     </AppText>
                   </View>
                 </TouchableOpacity>
+
 
                 {myAssignments.length > 0 && (
                   <>

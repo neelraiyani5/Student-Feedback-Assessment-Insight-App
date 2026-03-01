@@ -8,7 +8,7 @@ import { Platform } from "react-native";
 // For Android Emulator use 'http://10.0.2.2:3002'
 // For Physical Device use your machine's IP: 'http://192.168.x.x:3002'
 // const BASE_URL = "https://student-feedback-assessment-insight-app.onrender.com";
-const BASE_URL = "http://10.80.31.67:3001";
+const BASE_URL = "http://10.145.207.75:3001";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -27,6 +27,27 @@ api.interceptors.request.use(
     return config;
   },
   (error) => Promise.reject(error),
+);
+
+// Add a response interceptor to handle token expiration
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    // Only handle 401 for non-login endpoints
+    const isLoginRequest = error.config && error.config.url && error.config.url.includes('/auth/login');
+    if (error.response && error.response.status === 401 && !isLoginRequest) {
+      console.log("Token expired or unauthorized, clearing token...");
+      try {
+        await clearToken();
+        // Use dynamic import to safely access router outside React tree
+        const { router: expoRouter } = require('expo-router');
+        expoRouter.replace("/login");
+      } catch (navError) {
+        console.log("Navigation to login failed, token was cleared:", navError.message);
+      }
+    }
+    return Promise.reject(error);
+  }
 );
 
 export const loginUser = async (userId, password) => {
@@ -815,3 +836,45 @@ export const deleteTopic = async (topicId) => {
 };
 
 export default api;
+// Timetable APIs
+export const getTimetableSheets = async (formData) => {
+  try {
+    const response = await api.post("/timetable/get-sheets", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const uploadTimetable = async (data) => {
+  try {
+    const response = await api.post("/timetable/upload", data);
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const getTimetable = async (params) => {
+  try {
+    const response = await api.get("/timetable", { params });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const getAvailability = async (currentDay, currentTime) => {
+    try {
+        const response = await api.get("/timetable/availability", {
+            params: { currentDay, currentTime }
+        });
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error;
+    }
+};

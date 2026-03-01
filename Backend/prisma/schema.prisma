@@ -54,6 +54,7 @@ model User {
   feedbackResponses FeedbackResponse[]
   courseFileAssignments CourseFileAssignment[]
   courseFileLogs        CourseFileLog[]
+  timetableEntries      TimetableEntry[]
   mustChangePassword Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime? @updatedAt
@@ -197,6 +198,7 @@ model Semester {
   departmentId String     @db.ObjectId
   classes      Class[]
   subjects     Subject[]
+  timetableEntries TimetableEntry[]
   createdAt    DateTime   @default(now())
 
    @@unique([sem, departmentId], name: "sem_departmentId")
@@ -214,6 +216,7 @@ model Class {
   assessments Assessment[]
   feedbackSessions FeedbackSession[]
   courseFileAssignments CourseFileAssignment[]
+  timetableEntries TimetableEntry[]
   createdAt  DateTime @default(now())
 
   @@unique([name, semesterId])
@@ -230,6 +233,7 @@ model Subject {
   assessments Assessment[]
   feedbackSessions FeedbackSession[]
   courseFileAssignments CourseFileAssignment[]
+  timetableEntries TimetableEntry[]
   createdAt  DateTime @default(now())
   chapters   Chapter[]
 
@@ -297,5 +301,34 @@ model Marks {
   marksObtained Int
 
   @@unique([studentId, assessmentId])
+}
+
+model TimetableEntry {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  day         String   // e.g., "Monday", "Tuesday"
+  startTime   String   // e.g., "09:00 AM"
+  endTime     String   // e.g., "10:00 AM"
+  room        String   // classroom/location
+  
+  subjectId   String   @db.ObjectId
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+  
+  facultyId   String   @db.ObjectId
+  faculty     User     @relation(fields: [facultyId], references: [id])
+  
+  classId     String   @db.ObjectId
+  class       Class    @relation(fields: [classId], references: [id])
+
+  semesterId  String   @db.ObjectId
+  semester    Semester @relation(fields: [semesterId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([day, startTime, room]) // Room cannot be occupied twice at the same time
+  @@unique([day, startTime, facultyId]) // Faculty cannot be in two places at the same time
+  @@index([facultyId])
+  @@index([classId])
+  @@index([room])
 }
 

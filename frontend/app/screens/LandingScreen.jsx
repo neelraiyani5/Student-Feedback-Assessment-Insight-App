@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { StyleSheet, View, TouchableOpacity, ActivityIndicator } from "react-native";
@@ -6,10 +6,11 @@ import { COLORS, FONTS, SPACING, LAYOUT } from "../constants/theme";
 import AppText from "../components/AppText";
 import ScreenWrapper from "../components/ScreenWrapper";
 import { wp, hp } from "../utils/responsive";
-import { getToken, getMyProfile, getUserInfoFromToken } from "../services/api";
+import { getToken, getUserInfoFromToken } from "../services/api";
 
 export default function LandingScreen() {
   const router = useRouter();
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     checkLogin();
@@ -17,21 +18,51 @@ export default function LandingScreen() {
 
   const checkLogin = async () => {
     try {
+      // Step 1: Check if a token exists locally — NO network call
+      const token = await getToken();
+      if (!token) {
+        // No token at all → show the landing/welcome screen
+        setChecking(false);
+        return;
+      }
+
+      // Step 2: Decode the token locally to get role
       const userInfo = await getUserInfoFromToken();
-      if (userInfo && userInfo.role) {
-        if (userInfo.role === 'HOD' || userInfo.role === 'CC') {
-            router.replace('/coordinator-dashboard');
-        } else if (userInfo.role === 'FACULTY') {
-            router.replace('/faculty-dashboard');
-        } else if (userInfo.role === 'STUDENT') {
-            router.replace('/student-dashboard');
-        }
+      if (!userInfo || !userInfo.role) {
+        // Corrupted token → show landing
+        setChecking(false);
+        return;
+      }
+
+      // Step 3: Navigate directly to the correct dashboard
+      // The 401 interceptor will handle it if the token turns out to be expired
+      if (userInfo.role === 'HOD' || userInfo.role === 'CC') {
+        router.replace('/coordinator-dashboard');
+      } else if (userInfo.role === 'FACULTY') {
+        router.replace('/faculty-dashboard');
+      } else if (userInfo.role === 'STUDENT') {
+        router.replace('/student-dashboard');
+      } else {
+        setChecking(false);
       }
     } catch (error) {
-      console.log("Quick login check failed", error);
+      console.log("Token check failed:", error);
+      setChecking(false);
     }
   };
 
+  // While checking token, show a loading spinner — NOT the landing page
+  if (checking) {
+    return (
+      <ScreenWrapper backgroundColor={COLORS.white}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      </ScreenWrapper>
+    );
+  }
+
+  // Only show the "Streamline Academic Excellence" screen for first-time / logged-out users
   return (
     <ScreenWrapper backgroundColor={COLORS.white}>
       <View style={styles.container}>
@@ -56,21 +87,18 @@ export default function LandingScreen() {
             <AppText variant="body1" fontWeight="600" color={COLORS.white}>Log In</AppText>
           </TouchableOpacity>
         </View>
-
-        {/* <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.btn, { backgroundColor: COLORS.black }]}
-            onPress={() => router.push("/register")}
-          >
-             <AppText variant="body1" fontWeight="600" color={COLORS.white}>Create Account</AppText>
-          </TouchableOpacity>
-        </View> */}
       </View>
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.white,
+  },
   container: {
     flex: 1,
     justifyContent: "center",

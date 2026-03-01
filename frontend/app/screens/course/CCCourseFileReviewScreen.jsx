@@ -150,9 +150,12 @@ const CCCourseFileReviewScreen = () => {
             </AppText>
             <AppText
               variant="small"
-              style={{ color: COLORS.success, fontWeight: "600" }}
+              style={{ 
+                color: task.status === "COMPLETED" ? COLORS.success : COLORS.warning, 
+                fontWeight: "600" 
+              }}
             >
-              ✓ Completed by Faculty
+              {task.status === "COMPLETED" ? "✓ Completed by Faculty" : "🕒 Pending Faculty action"}
             </AppText>
           </View>
           <View>

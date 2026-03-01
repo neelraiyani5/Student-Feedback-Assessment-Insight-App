@@ -128,12 +128,11 @@ export const getHodReviewableTasks = async (req, res) => {
         .json({ message: "Not authorized to review this assignment" });
     }
 
-    // Get only tasks that are COMPLETED by faculty
-    // These are the only tasks HOD can review
+    // Get ALL tasks for this assignment
+    // This allows HOD to see overall progress, including pending tasks
     const tasks = await prisma.courseFileTaskSubmission.findMany({
       where: {
         assignmentId,
-        status: "COMPLETED", // Only completed tasks can be reviewed
       },
       include: {
         template: { select: { id: true, title: true, description: true } },
@@ -148,19 +147,22 @@ export const getHodReviewableTasks = async (req, res) => {
       orderBy: { deadline: "asc" },
     });
 
-    // Add metadata about review status
-    const enrichedTasks = tasks.map((task) => ({
-      ...task,
-      isReviewable: task.status === "COMPLETED" && task.ccStatus !== "PENDING",
-      reviewHistory: {
-        ccReviewed: task.ccStatus !== "PENDING",
-        ccStatus: task.ccStatus,
-        ccReviewDate: task.ccReviewDate,
-        hodReviewed: task.hodStatus !== "PENDING",
-        hodStatus: task.hodStatus,
-        hodReviewDate: task.hodReviewDate,
-      },
-    }));
+    // Add metadata about review status and completion
+    const enrichedTasks = tasks.map((task) => {
+      const isCompleted = task.status === "COMPLETED";
+      return {
+        ...task,
+        isReviewable: isCompleted && task.ccStatus !== "PENDING",
+        reviewHistory: {
+          ccReviewed: task.ccStatus !== "PENDING",
+          ccStatus: task.ccStatus,
+          ccReviewDate: task.ccReviewDate,
+          hodReviewed: task.hodStatus !== "PENDING",
+          hodStatus: task.hodStatus,
+          hodReviewDate: task.hodReviewDate,
+        },
+      };
+    });
 
     res.status(200).json({
       assignment: {
